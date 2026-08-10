@@ -234,6 +234,9 @@ Target structure:
 .
 ├── TECHNICAL_SPEC.md
 ├── README.md
+├── COOLIFY.md
+├── Dockerfile
+├── docker-entrypoint.sh
 ├── docker-compose.yml
 ├── package.json
 ├── prisma/
@@ -278,7 +281,9 @@ Target structure:
 └── form_example/
 ```
 
-The `storage/` directory should be gitignored except for `.gitkeep` files.
+The `storage/` directory should be gitignored except for `.gitkeep` files. In
+production Docker/Coolify deployments, mount persistent storage at `/app/storage`
+and set `STORAGE_DIR=/app/storage`.
 
 ## 7. Environment Variables
 
@@ -304,6 +309,11 @@ APP_ENCRYPTION_KEY=replace-with-base64-32-byte-key
 
 # Storage
 STORAGE_DIR=./storage
+
+# Container startup
+RUN_DB_MIGRATIONS=true
+MIGRATION_MAX_ATTEMPTS=20
+BOOTSTRAP_ADMIN=true
 
 # Worker
 WORKER_POLL_INTERVAL_MS=2000

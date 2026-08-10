@@ -31,7 +31,21 @@ Open `http://localhost:3000` and log in with the admin credentials from `.env`.
 - `npm run dev` starts the Next.js app.
 - `npm run worker` starts the PostgreSQL-backed worker loop.
 - `npm run build` generates Prisma Client and builds the Next app.
+- `npm run prisma:migrate:deploy` applies production Prisma migrations.
+- `npm run admin:bootstrap` creates the first admin user from environment variables.
 - `npm test` runs focused unit tests.
+
+## Coolify Deployment
+
+This project includes a production `Dockerfile`, startup entrypoint, `/api/health` endpoint, and initial Prisma migration for Coolify.
+
+In Coolify, use Dockerfile build pack, expose port `3000`, and mount persistent storage at:
+
+```text
+/app/storage
+```
+
+All uploaded media and rendered static blog builds live under that mounted directory. See `COOLIFY.md` for the full environment variable checklist and optional worker service setup.
 
 ## Current V1 Coverage
 
