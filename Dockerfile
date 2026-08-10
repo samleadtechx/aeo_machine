@@ -20,6 +20,7 @@ RUN npm ci --include=dev
 FROM deps AS builder
 
 COPY . .
+RUN mkdir -p public
 RUN npx prisma generate
 RUN npm run build
 
