@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Rosie Missed Calls Quiz (Plumbing)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%2300AEEF' d='M32 4C24 18 14 28 14 40a18 18 0 1036 0C50 28 40 18 32 4z'/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/png" href="./respective_style_files/32x32.png" sizes="32x32" />
+  <link rel="stylesheet" href="./respective_style_files/roboto.css" />
+  <style>
+    :root{
+      --bg:#f5f5f5;
+      --card:#ffffff;
+      --text:#202020;
+      --muted:#3b3b3c;
+      --accent:#e0381b;
+      --accent2:#be2f16;
+      --border:#e9e9e9;
+      --radius:18px;
+      --shadow:0 18px 45px rgba(0,0,0,.08);
+      --max:980px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Roboto", ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .wrap{
+      min-height:100svh;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:10px 16px 30px;
+      background:
+        radial-gradient(1600px 350px at 50% -120px, rgba(224,56,27,.16), transparent 70%),
+        var(--bg);
+    }
+    .panel{
+      width:100%;
+      max-width:1200px;
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      padding:10px 2px 14px;
+      background:transparent;
+    }
+    .brand{
+      border:none;
+      background:transparent;
+      cursor:pointer;
+      padding:0;
+      line-height:0;
+    }
+    .brand img{
+      display:block;
+      height:38px;
+      width:auto;
+    }
+    .topmeta{
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      flex:1;
+      min-width:0;
+    }
+    .kicker{
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .progressline{
+      height:7px;
+      background:#e9e9e9;
+      border-radius:999px;
+      overflow:hidden;
+      border:none;
+      width:100%;
+      max-width:none;
+    }
+    .progressline > div{
+      height:100%;
+      width:0%;
+      background:var(--accent);
+      border-radius:999px;
+      transition:width .25s ease;
+    }
+    .pageProgress{
+      width:100%;
+      padding-left:2px;
+      padding-right:2px;
+    }
+    .pageProgressTop{
+      padding-top:2px;
+      padding-bottom:12px;
+    }
+    .pageProgressBottom{
+      padding-top:14px;
+      padding-bottom:2px;
+    }
+
+    .content{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:22px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      padding:26px 18px 22px;
+    }
+    .center{
+      max-width:720px;
+      margin:0 auto;
+      text-align:center;
+    }
+    #screenQuestion .center{
+      max-width:920px;
+      text-align:left;
+    }
+    h1,h2{margin:0 0 10px}
+    h1{font-size:34px; line-height:1.12; letter-spacing:-.02em}
+    h2{font-size:30px; line-height:1.15; letter-spacing:-.02em}
+    p{margin:0 0 14px; color:var(--muted); font-size:18px; line-height:1.35}
+    .note{font-size:13px;color:var(--muted)}
+    .introBlock{
+      text-align:center;
+      padding:8px 0 28px;
+    }
+    .introKicker{
+      color:var(--accent);
+      font-size:22px;
+      font-weight:700;
+      margin:0 0 18px;
+    }
+    .introTitle{
+      margin:0 auto 18px;
+      max-width:780px;
+      font-size:66px;
+      line-height:1.05;
+      letter-spacing:-.02em;
+      font-weight:700;
+      color:#1f2025;
+    }
+    .introSub{
+      margin:0 auto;
+      max-width:680px;
+      font-size:24px;
+      line-height:1.3;
+      color:#3b3b3c;
+    }
+    @media (max-width:980px){
+      .introTitle{font-size:52px}
+      .introSub{font-size:21px}
+    }
+    @media (max-width:760px){
+      .introTitle{font-size:38px}
+      .introKicker{font-size:18px}
+      .introSub{font-size:19px}
+    }
+    .qHeader{
+      margin-top:8px;
+      text-align:center;
+    }
+    .qHeader h2{
+      font-size:42px;
+      line-height:1.07;
+      margin-bottom:16px;
+    }
+    .qHeader p{
+      font-size:18px;
+      max-width:760px;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    @media (max-width:980px){
+      .qHeader h2{font-size:34px}
+    }
+    @media (max-width:760px){
+      .qHeader h2{font-size:26px}
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+      margin:18px auto 0;
+      max-width:680px;
+      align-items:start;
+    }
+
+    .choice{
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+      cursor:pointer;
+      text-align:left;
+      transition:transform .08s ease, border-color .08s ease, box-shadow .08s ease;
+      user-select:none;
+    }
+    .choice:hover{
+      transform:translateY(-1px) scale(1.01);
+      border-color:#d9dde3;
+      box-shadow:0 12px 28px rgba(0,0,0,.1);
+    }
+    .choice .img{
+      aspect-ratio:4 / 2.7;
+      width:100%;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#111;
+      font-weight:700;
+      font-size:18px;
+      border-bottom:1px solid var(--border);
+    }
+    .choice .img img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .choice .btn{
+      background:var(--accent);
+      color:#fff;
+      padding:8px 10px;
+      font-weight:800;
+      text-align:center;
+      font-size:13px;
+      min-height:72px;
+      line-height:1.15;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .choice:active .btn{background:var(--accent2)}
+    .choice:active{transform:translateY(0px)}
+
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:space-between;
+      align-items:center;
+      margin-top:18px;
+      padding-top:14px;
+      border-top:1px solid var(--border);
+    }
+    .linkbtn{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      font-weight:700;
+      cursor:pointer;
+      padding:10px 8px;
+    }
+    .linkbtn:hover{color:#111}
+    .primary{
+      border:none;
+      background:var(--accent);
+      color:#fff;
+      font-weight:900;
+      border-radius:12px;
+      padding:12px 16px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 12px 22px rgba(224,56,27,.22);
+    }
+    .primary:hover{background:var(--accent2)}
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      justify-content:center;
+      background:rgba(224,56,27,.08);
+      border:1px solid rgba(224,56,27,.18);
+      color:var(--accent2);
+      padding:8px 12px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:12px;
+      margin-bottom:10px;
+    }
+    .resultBox{
+      margin:18px auto 0;
+      max-width:720px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:16px;
+      background:#fff;
+      text-align:left;
+    }
+    .resultBig{
+      font-size:22px;
+      font-weight:950;
+      margin:6px 0 10px;
+    }
+    .bullets{
+      margin:0;
+      padding-left:18px;
+      color:#262a33;
+    }
+    .bullets li{margin:8px 0; line-height:1.35}
+    .form{
+      margin-top:14px;
+      display:grid;
+      gap:10px;
+    }
+    .emailInputWrap{
+      position:relative;
+    }
+    .emailEmoji{
+      position:absolute;
+      left:16px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:22px;
+      line-height:1;
+      opacity:.9;
+      pointer-events:none;
+    }
+    .emailInputWrap .emailEmoji img{
+      width:22px;
+      height:22px;
+      display:block;
+    }
+    .resultBox .form #email{
+      padding:18px 16px 18px 56px;
+      font-size:18px;
+      border-radius:12px;
+      min-height:76px;
+      border-width:3px;
+    }
+    .resultBox .form #submitBtn{
+      min-height:58px;
+      padding:14px 18px;
+      font-size:18px;
+      border-radius:12px;
+      justify-content:center;
+    }
+    .row2{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    @media (min-width:760px){
+      .row2{grid-template-columns:1fr 1fr}
+    }
+    input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font-size:15px;
+      outline:none;
+    }
+    input:focus{border-color:rgba(224,56,27,.6); box-shadow:0 0 0 4px rgba(224,56,27,.12)}
+    .checkbox{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .checkbox input{width:18px;height:18px;margin-top:2px}
+    .smallmuted{font-size:12px;color:var(--muted);margin-top:6px}
+    .footerLinks{
+      margin-top:20px;
+      padding-top:14px;
+      border-top:1px solid var(--border);
+      display:flex;
+      gap:18px;
+      justify-content:center;
+      align-items:center;
+      font-size:13px;
+    }
+    .footerLinks a{
+      color:var(--muted);
+      text-decoration:underline;
+    }
+    .footerLinks a:hover{
+      color:var(--text);
+    }
+    img.emoji{
+      width:1em;
+      height:1em;
+      margin:0 .05em 0 .1em;
+      vertical-align:-0.12em;
+      display:inline-block;
+    }
+    .hidden{display:none !important}
+  </style>
+
+
+
+
+
+<script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "vfics4mw99");
+</script>
+
+
+
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel" role="application" aria-label="Rosie plumbing missed calls quiz">
+      <div class="pageProgress pageProgressTop" aria-label="Top progress">
+        <div class="progressline">
+          <div id="progressFillTop"></div>
+        </div>
+      </div>
+
+      <div class="topbar">
+        <button class="brand" aria-label="Rosie logo">
+          <img src="./respective_style_files/618889214894bd0020c3be46.png" alt="Logo" />
+        </button>
+        <div class="topmeta">
+          <div class="kicker" id="kicker">Quick plumbing check</div>
+          <div class="note" id="stepLabel"> </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <!-- screens -->
+        <section id="screenHero">
+          <div class="center">
+            <div class="pill">Plumbing Call Leak Calculator</div>
+            <h1>Check How Many Extra Plumbing Jobs Rosie AI Can Book for You.</h1>
+            <p>Answer 4 quick questions and we’ll estimate what missed calls are worth in dollars.</p>
+            <button class="primary" id="startBtn">
+              Start (takes 20 seconds) <span aria-hidden="true">→</span>
+            </button>
+            <div class="smallmuted">Mobile-first. Tap answers. No typing until the end.</div>
+          </div>
+        </section>
+
+        <section id="screenQuestion" class="hidden">
+          <div class="center">
+            <div class="introBlock" id="introBlock">
+              <p class="introKicker">Never miss another plumbing lead</p>
+              <h1 class="introTitle">Check How Many Extra Plumbing Jobs Rosie AI Can Book for You.</h1>
+              <p class="introSub">Answer 4 quick questions and we’ll estimate what missed calls are worth in dollars.</p>
+            </div>
+
+            <div class="qHeader">
+            <div class="note" id="qMeta">Question</div>
+            <h2 id="qTitle"> </h2>
+            <p id="qSub"> </p>
+            </div>
+
+            <div class="grid2" id="choices"></div>
+
+            <div class="actions">
+              <button class="linkbtn" id="backBtn">← Back</button>
+              <button class="linkbtn" id="restartBtn">Restart</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="screenResult" class="hidden">
+          <div class="center">
+            <div class="pill">Your Result</div>
+            <h2>Here’s the uncomfortable truth.</h2>
+            <p id="resultLead"></p>
+
+            <div class="resultBox">
+              <div class="resultBig" id="resultBig">$0 / week</div>
+              <ul class="bullets" id="resultBullets"></ul>
+
+              <div class="form">
+                <div class="emailInputWrap">
+                  <span class="emailEmoji" aria-hidden="true">✉️</span>
+                  <input id="email" placeholder="E-mail address" autocomplete="email" inputmode="email" />
+                </div>
+
+                <button class="primary" id="submitBtn">
+                  Try Rosie for free—no commitment <span aria-hidden="true">⚙️</span>
+                </button>
+
+                <div class="smallmuted" id="submitNote">
+                  Onboarding takes a few minutes, and you can forward missed calls right away. It works with the same phone number you already have.
+                </div>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="linkbtn" id="backToAnswersBtn">← Back</button>
+              <button class="linkbtn" id="copyBtn">Copy result text</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="screenDone" class="hidden">
+          <div class="center">
+            <div class="pill">Submitted</div>
+            <h2>Done.</h2>
+            <p>Captured lead data locally (demo). Replace the submit handler with your webhook/CRM.</p>
+            <button class="primary" id="againBtn">Run again</button>
+          </div>
+        </section>
+
+        <footer class="footerLinks" aria-label="Legal links">
+          <a href="terms.html">Terms of Service</a>
+          <a href="privacy.html">Privacy Policy</a>
+        </footer>
+      </div>
+
+      <div class="pageProgress pageProgressBottom" aria-label="Bottom progress">
+        <div class="progressline">
+          <div id="progressFillBottom"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+  <script>
+    const TRACK_URL = "https://track.leadtechx.com/go/22";
+    const PIXEL_ID = "695378603090688";
+    const CAPI_URL = new URL("capi.php", window.location.href).toString();
+
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+
+    function genEventId(){
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "evt_" + Math.random().toString(36).slice(2) + Date.now();
+    }
+
+    function escapeRegExp(value){
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function getCookie(name){
+      const m = document.cookie.match(new RegExp("(?:^|; )" + escapeRegExp(name) + "=([^;]*)"));
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+
+    function getPageContextParams(){
+      const params = {};
+      const qp = new URLSearchParams(window.location.search);
+      qp.forEach((value, key) => {
+        params[key] = value;
+      });
+      if (document.referrer) params.referrer = document.referrer;
+      params.source_url = window.location.href;
+      const fbp = getCookie("_fbp");
+      if (fbp) params.fbp = fbp;
+      const fbclid = qp.get("fbclid");
+      if (fbclid) params.fbclid = fbclid;
+      return params;
+    }
+
+    function capiFire(eventName, eventId, extraParams){
+      const context = getPageContextParams();
+      const qs = new URLSearchParams({
+        event_name: eventName,
+        event_id: eventId,
+        event_source_url: window.location.href,
+        user_agent: navigator.userAgent,
+        fbclid: context.fbclid || "",
+        fbp: context.fbp || ""
+      });
+
+      Object.entries({ ...context, ...(extraParams || {}) }).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          qs.set(key, String(value));
+        }
+      });
+
+      (new Image()).src = CAPI_URL + "?" + qs.toString() + "&_cb=" + Date.now();
+    }
+
+    function fireMetaEvent(eventName, extraParams){
+      const eventId = genEventId();
+      const params = { ...getPageContextParams(), ...(extraParams || {}) };
+
+      if (typeof window.fbq === "function") {
+        window.fbq("track", eventName, params, { eventID: eventId });
+      }
+      capiFire(eventName, eventId, params);
+      return eventId;
+    }
+
+    function buildTrackUrl(email){
+      const url = new URL(TRACK_URL);
+      const qp = new URLSearchParams(window.location.search);
+      qp.forEach((value, key) => {
+        url.searchParams.append(key, value);
+      });
+      if (document.referrer) url.searchParams.set("referrer", document.referrer);
+      url.searchParams.set("email", email || "");
+      url.searchParams.set("source_url", window.location.href);
+
+      const fbp = getCookie("_fbp");
+      if (fbp) url.searchParams.set("fbp", fbp);
+      const fbclid = qp.get("fbclid");
+      if (fbclid) url.searchParams.set("fbclid", fbclid);
+
+      // Pass quiz answers in fixed order for downstream tracking.
+      quiz.forEach((q, index) => {
+        const value = state.answers[q.id] || "";
+        url.searchParams.set(`question${index + 1}`, value);
+      });
+
+      return url.toString();
+    }
+
+    if (typeof window.fbq === "function") {
+      window.fbq("init", PIXEL_ID);
+    }
+    fireMetaEvent("PageView");
+
+    // ------------------------------
+    // 2-option Perspective-style flow (4 questions)
+    // ------------------------------
+    const quiz = [
+      {
+        id: "owner",
+        kicker: "Authority gate",
+        title: "Do you own a plumbing business?",
+        sub: "Be honest. This is built for owners/decision-makers.",
+        options: [
+          { label: "Yes — I’m the owner / decision maker", value: "owner", imgText: "Owner", img: "./respective_style_files/q1_yes.jpg" },
+          { label: "No — I’m not the owner", value: "not_owner", imgText: "Not owner", img: "./respective_style_files/q1_no.jpg" }
+        ]
+      },
+      {
+        id: "missed",
+        kicker: "The pain",
+        title: "Do you miss calls during jobs, nights, or weekends?",
+        sub: "If you can’t pick up, someone else will.",
+        options: [
+          { label: "Yes — it happens regularly", value: "miss_regular", imgText: "Missed calls", img: "./respective_style_files/q2_yes.jpg" },
+          { label: "No — we answer every call", value: "miss_never", imgText: "Answered", img: "./respective_style_files/q2_no.jpg" }
+        ]
+      },
+      {
+        id: "value",
+        kicker: "The money",
+        title: "Is one average booked job worth more than $300 in profit?",
+        sub: "This decides whether voicemail is “expensive” or “insane.”",
+        options: [
+          { label: "Yes — absolutely", value: "value_high", imgText: "$300+", img: "./respective_style_files/q3_yes.jpg" },
+          { label: "No — it’s less than that", value: "value_low", imgText: "<$300", img: "./respective_style_files/q3_no.jpg" }
+        ]
+      },
+      {
+        id: "want",
+        kicker: "The fix",
+        title: "Would you want missed calls automatically answered and booked?",
+        sub: "No hiring. No training. No ‘please leave a message.’",
+        options: [
+          { label: "Yes — book jobs for me", value: "want_yes", imgText: "Auto-book", img: "./respective_style_files/q4_yes.jpg" },
+          { label: "No — voicemail is fine", value: "want_no", imgText: "Voicemail", img: "./respective_style_files/q4_no.jpg" }
+        ]
+      }
+    ];
+
+    const state = {
+      step: -1, // -1 hero, 0..3 questions, then result
+      answers: {},
+      lead: null
+    };
+    let viewContentTracked = false;
+
+    const el = (id) => document.getElementById(id);
+
+    const screenHero = el("screenHero");
+    const screenQuestion = el("screenQuestion");
+    const screenResult = el("screenResult");
+    const screenDone = el("screenDone");
+
+    const kicker = el("kicker");
+    const stepLabel = el("stepLabel");
+    const progressFillTop = el("progressFillTop");
+    const progressFillBottom = el("progressFillBottom");
+
+    const qMeta = el("qMeta");
+    const qTitle = el("qTitle");
+    const qSub = el("qSub");
+    const choices = el("choices");
+    const introBlock = el("introBlock");
+    const backBtn = el("backBtn");
+
+    function renderEmojis(){
+      if (window.twemoji){
+        window.twemoji.parse(document.body, { folder: "svg", ext: ".svg" });
+      }
+    }
+
+    function show(screen){
+      [screenHero, screenQuestion, screenResult, screenDone].forEach(s => s.classList.add("hidden"));
+      screen.classList.remove("hidden");
+      renderEmojis();
+    }
+
+    function setProgress(){
+      // 0% on hero, then 1/5.. but we have 4 questions + result = 5 "stops"
+      const totalStops = quiz.length + 1; // result stop
+      const currentStop = Math.max(0, Math.min(totalStops, state.step + 1)); // hero=0, q1=1...
+      const pct = (currentStop / totalStops) * 100;
+      const width = pct.toFixed(1) + "%";
+      if (progressFillTop) progressFillTop.style.width = width;
+      if (progressFillBottom) progressFillBottom.style.width = width;
+
+      if (state.step < 0){
+        kicker.textContent = "Quick plumbing check";
+        stepLabel.textContent = " ";
+      } else if (state.step < quiz.length){
+        kicker.textContent = quiz[state.step].kicker;
+        stepLabel.textContent = `Question ${state.step + 1} of ${quiz.length}`;
+      } else {
+        kicker.textContent = "Result";
+        stepLabel.textContent = "Last step";
+      }
+    }
+
+    function renderQuestion(){
+      const q = quiz[state.step];
+      qMeta.textContent = `Question ${state.step + 1} of ${quiz.length}`;
+      qTitle.textContent = q.title;
+      qSub.textContent = q.sub;
+
+      choices.innerHTML = "";
+      if (state.step === 0){
+        introBlock.classList.remove("hidden");
+        qMeta.classList.add("hidden");
+        backBtn.classList.add("hidden");
+      } else {
+        introBlock.classList.add("hidden");
+        qMeta.classList.remove("hidden");
+        backBtn.classList.remove("hidden");
+      }
+
+      q.options.forEach((opt) => {
+        const card = document.createElement("div");
+        card.className = "choice";
+        card.setAttribute("role","button");
+        card.setAttribute("tabindex","0");
+
+        const imageBlock = opt.img
+          ? `<img src="${opt.img}" alt="" loading="lazy" />`
+          : `${opt.imgText ?? ""}`;
+
+        card.innerHTML = `
+          <div class="img">${imageBlock}</div>
+          <div class="btn">${opt.label}</div>
+        `;
+
+        const pick = () => {
+          state.answers[q.id] = opt.value;
+          next();
+        };
+        card.addEventListener("click", pick);
+        card.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
+        });
+
+        choices.appendChild(card);
+      });
+    }
+
+    function next(){
+      state.step++;
+      setProgress();
+
+      if (state.step < quiz.length){
+        show(screenQuestion);
+        renderQuestion();
+      } else {
+        // result
+        if (!viewContentTracked){
+          fireMetaEvent("ViewContent", {
+            content_name: "Quiz Completed",
+            content_type: "quiz"
+          });
+          viewContentTracked = true;
+        }
+        show(screenResult);
+        renderResult();
+      }
+      renderEmojis();
+    }
+
+    function back(){
+      if (state.step <= 0){
+        return;
+      }
+      state.step--;
+      setProgress();
+      show(screenQuestion);
+      renderQuestion();
+      renderEmojis();
+    }
+
+    function restart(){
+      state.step = 0;
+      state.answers = {};
+      setProgress();
+      show(screenQuestion);
+      renderQuestion();
+      // reset form
+      ["email"].forEach(id=>{
+        const e = el(id);
+        if (!e) return;
+        e.value = "";
+      });
+    }
+
+    function money(n){
+      return n.toLocaleString("en-US", { style:"currency", currency:"USD", maximumFractionDigits:0 });
+    }
+
+    function renderResult(){
+      // Simple, explainable math (no question 5):
+      // If missed calls => assume 6 missed/week "regularly", else a floor of 1/week.
+      // Value model: each missed call carries direct value loss,
+      // then we apply a realizable-loss factor to avoid overestimation.
+      // High bucket => $450 per missed call, low bucket => $300 per missed call.
+      const owner = state.answers.owner === "owner";
+      const misses = state.answers.missed === "miss_regular";
+      const high = state.answers.value === "value_high";
+      const wants = state.answers.want === "want_yes";
+
+      const missedCallsPerWeek = misses ? 6 : 1;       // floor at 1/week even for teams that answer most calls
+      const valuePerMissedCall = high ? 450 : 300;     // conservative floor per missed call
+      const lossFactor = 0.60;                         // count 60% of missed-call value as actual revenue loss
+      const weeklyLost = Math.round(missedCallsPerWeek * valuePerMissedCall * lossFactor);
+      const monthlyLost = weeklyLost * 4;
+      const rosieSubscriptionMonthly = 49;
+      const rosieMultiple = (monthlyLost / rosieSubscriptionMonthly).toFixed(1);
+
+      const lead = el("resultLead");
+      const big = el("resultBig");
+      const bullets = el("resultBullets");
+
+      // Copy tone: harsh but not insane
+      if (!owner){
+        lead.textContent = "Not the owner? This is for decision-makers.";
+      } else if (!misses){
+        lead.textContent = "Even strong teams miss a few calls. We model a minimum of 1 missed call/week.";
+      } else {
+        lead.textContent = "Missed calls usually mean lost jobs.";
+      }
+
+      big.textContent = `${money(weeklyLost)} / week likely leaking 💧💧`;
+
+      const lines = [];
+      lines.push(`Missed calls/week: ${missedCallsPerWeek}.`);
+      lines.push(`Value per missed call: ${money(valuePerMissedCall)}.`);
+      lines.push(`Loss factor applied: ${Math.round(lossFactor * 100)}%.`);
+      lines.push(`Estimated loss: ${money(weeklyLost)}/week (${money(monthlyLost)}/month).`);
+
+      if (misses && wants){
+        lines.push(`Rosie at ${money(rosieSubscriptionMonthly)} a month is ${rosieMultiple}× cheaper than the ${money(monthlyLost)} a month you lose in revenue without it.`);
+      } else if (misses && !wants){
+        lines.push("Voicemail is fine, but it has a cost.");
+      } else if (!misses){
+        lines.push("Most companies, even with dispatch staff, still miss some calls.");
+        lines.push(`Rosie at ${money(rosieSubscriptionMonthly)} a month is ${rosieMultiple}× cheaper than the ${money(monthlyLost)} a month you lose in revenue without it.`);
+      }
+
+      bullets.innerHTML = lines.map(x => `<li>${x}</li>`).join("");
+
+      // Store a copyable summary
+      window.__resultText = [
+        "Rosie Plumbing Missed Calls Result",
+        `Weekly leak: ${money(weeklyLost)}`,
+        `Monthly leak: ${money(monthlyLost)}`,
+        `Inputs: owner=${owner}, misses=${misses}, profitBucket=${high ? ">$300" : "<=$300"}, wants=${wants}`,
+        `Assumptions: missedCallsPerWeek=${missedCallsPerWeek}, valuePerMissedCall=${valuePerMissedCall}, lossFactor=${lossFactor}`
+      ].join("\n");
+    }
+
+    // ------------------------------
+    // Demo submit handler
+    // Replace with fetch() to your webhook/CRM
+    // ------------------------------
+    function submit(){
+      const email = el("email").value.trim();
+      const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      if (!looksLikeEmail){
+        alert("Please enter a valid email address.");
+        return;
+      }
+
+      const payload = {
+        email,
+        answers: state.answers,
+        resultText: window.__resultText || ""
+      };
+
+      // Demo: store locally
+      try {
+        const key = "rosie_plumbing_quiz_leads";
+        const existing = JSON.parse(localStorage.getItem(key) || "[]");
+        existing.push({ ...payload, ts: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch (_) {}
+
+      console.log("LEAD PAYLOAD (demo):", payload);
+      fireMetaEvent("Lead", {
+        email,
+        content_name: "Rosie Onboarding Started",
+        content_type: "lead"
+      });
+
+      const onboardingUrl = buildTrackUrl(email);
+      window.location.assign(onboardingUrl);
+    }
+
+    // ------------------------------
+    // Wire up UI
+    // ------------------------------
+    const startBtn = el("startBtn");
+    if (startBtn){
+      startBtn.addEventListener("click", () => { state.step = -1; next(); });
+    }
+    el("backBtn").addEventListener("click", back);
+    el("restartBtn").addEventListener("click", restart);
+    el("backToAnswersBtn").addEventListener("click", () => {
+      // go back to last question
+      state.step = quiz.length - 1;
+      setProgress();
+      show(screenQuestion);
+      renderQuestion();
+    });
+    el("submitBtn").addEventListener("click", submit);
+    el("againBtn").addEventListener("click", restart);
+    el("copyBtn").addEventListener("click", async () => {
+      const txt = window.__resultText || "";
+      try{
+        await navigator.clipboard.writeText(txt);
+        alert("Copied.");
+      } catch {
+        alert("Copy failed. You can copy from console.");
+        console.log(txt);
+      }
+    });
+
+    // Init
+    setProgress();
+    state.step = 0;
+    show(screenQuestion);
+    renderQuestion();
+    renderEmojis();
+  </script>
+</body>
+</html>

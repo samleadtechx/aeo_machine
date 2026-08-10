@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+dist
+.env*.local
+.env
+storage/**
+!storage/
+!storage/media/
+!storage/builds/
+!storage/tmp/
+!storage/media/.gitkeep
+!storage/builds/.gitkeep
+!storage/tmp/.gitkeep
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
