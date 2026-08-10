@@ -52,6 +52,8 @@ MIGRATION_MAX_ATTEMPTS=20
 BOOTSTRAP_ADMIN=true
 ```
 
+Keep these variables **runtime-only** in Coolify. Do not enable "Available at Buildtime" for `NODE_ENV`, database credentials, admin credentials, or secrets. The Dockerfile installs build tooling explicitly, and build-time secrets are unnecessary.
+
 Generate secrets locally with:
 
 ```bash

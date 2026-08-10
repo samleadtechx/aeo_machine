@@ -13,7 +13,9 @@ RUN apt-get update \
 FROM base AS deps
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# Coolify can expose runtime env vars during build. Force build tooling such as
+# Tailwind/PostCSS/TypeScript to install even if NODE_ENV=production is present.
+RUN npm ci --include=dev
 
 FROM deps AS builder
 
