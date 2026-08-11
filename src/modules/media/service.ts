@@ -2,6 +2,8 @@ import { createHash } from "crypto";
 import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 import { nanoid } from "nanoid";
+import sharp from "sharp";
+import type { Blog, ImageOutputFormat } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { appUrl, storageDir } from "@/lib/env";
 import { ensureSlug } from "@/lib/utils/slugify";
@@ -18,6 +20,28 @@ export type BuildMediaMap = Record<string, string>;
 export type BuildImageSourceMap = Record<string, string>;
 
 const maxRemoteImageBytes = 12 * 1024 * 1024;
+const defaultImageSettings = {
+  imageOptimizationEnabled: true,
+  imageOutputFormat: "WEBP" as ImageOutputFormat,
+  imageQuality: 82,
+  imageMaxWidth: 1600,
+  logoMaxWidth: 480,
+};
+
+type ImageSettings = typeof defaultImageSettings;
+type ImageRole = "article" | "logo";
+type BuildBlogImageSettings = Pick<
+  Blog,
+  | "id"
+  | "logoMediaId"
+  | "faviconMediaId"
+  | "organizationLogoMediaId"
+  | "imageOptimizationEnabled"
+  | "imageOutputFormat"
+  | "imageQuality"
+  | "imageMaxWidth"
+  | "logoMaxWidth"
+>;
 
 export async function listMediaAssets(blogId?: string) {
   return prisma.mediaAsset.findMany({
@@ -37,8 +61,16 @@ export async function createMediaAsset(input: {
   if (!allowedMimeTypes.has(input.mimeType)) {
     throw new Error("Unsupported image type.");
   }
-  const hash = createHash("sha256").update(input.bytes).digest("hex");
-  const extension = extensionFor(input.originalName, input.mimeType);
+  const settings = await imageSettingsForBlog(input.blogId);
+  const optimized = await optimizeImageBytes({
+    bytes: input.bytes,
+    mimeType: input.mimeType,
+    originalName: input.originalName,
+    settings,
+    role: "article",
+  });
+  const hash = createHash("sha256").update(optimized.bytes).digest("hex");
+  const extension = extensionFor(input.originalName, optimized.mimeType);
   const basename = ensureSlug(path.basename(input.originalName, path.extname(input.originalName)), "image");
   const filename = `${basename}-${nanoid(10)}${extension}`;
   const relativeDir = path.join("media", input.blogId || "global");
@@ -47,15 +79,17 @@ export async function createMediaAsset(input: {
   const absolutePath = path.resolve(storageDir(), relativePath);
 
   await mkdir(absoluteDir, { recursive: true });
-  await writeFile(absolutePath, input.bytes);
+  await writeFile(absolutePath, optimized.bytes);
 
   return prisma.mediaAsset.create({
     data: {
       blogId: input.blogId || null,
       filename,
       originalName: input.originalName,
-      mimeType: input.mimeType,
-      sizeBytes: input.bytes.length,
+      mimeType: optimized.mimeType,
+      sizeBytes: optimized.bytes.length,
+      width: optimized.width,
+      height: optimized.height,
       storagePath: relativePath.split(path.sep).join("/"),
       publicPath: `/assets/media/${filename}`,
       altText: input.altText || null,
@@ -64,14 +98,14 @@ export async function createMediaAsset(input: {
   });
 }
 
-export async function copyMediaAssetsToBuild(blogId: string, mediaIds: string[], outputPath: string) {
+export async function copyMediaAssetsToBuild(blog: BuildBlogImageSettings, mediaIds: string[], outputPath: string) {
   const uniqueIds = Array.from(new Set(mediaIds.filter(Boolean)));
   if (uniqueIds.length === 0) return {};
 
   const assets = await prisma.mediaAsset.findMany({
     where: {
       id: { in: uniqueIds },
-      OR: [{ blogId }, { blogId: null }],
+      OR: [{ blogId: blog.id }, { blogId: null }],
     },
   });
   const mediaDir = path.join(outputPath, "assets", "media");
@@ -81,9 +115,22 @@ export async function copyMediaAssetsToBuild(blogId: string, mediaIds: string[],
   for (const asset of assets) {
     const source = path.resolve(storageDir(), asset.storagePath);
     await stat(source);
-    const target = path.join(mediaDir, asset.filename);
-    await copyFile(source, target);
-    const buildPath = `/assets/media/${asset.filename}`;
+    const role = isBlogLogoAsset(blog, asset.id) ? "logo" : "article";
+    const optimized = await optimizeImageBytes({
+      bytes: await readFile(source),
+      mimeType: asset.mimeType,
+      originalName: asset.filename,
+      settings: imageSettingsFromBlog(blog),
+      role,
+    });
+    const filename = filenameWithMimeType(asset.filename, optimized.mimeType);
+    const target = path.join(mediaDir, filename);
+    if (optimized.changed || filename !== asset.filename) {
+      await writeFile(target, optimized.bytes);
+    } else {
+      await copyFile(source, target);
+    }
+    const buildPath = `/assets/media/${filename}`;
     map[asset.id] = buildPath;
     map[asset.publicPath] = buildPath;
     map[asset.storagePath] = buildPath;
@@ -93,7 +140,11 @@ export async function copyMediaAssetsToBuild(blogId: string, mediaIds: string[],
   return map;
 }
 
-export async function copyRemoteImagesToBuild(imageSources: string[], outputPath: string) {
+export async function copyRemoteImagesToBuild(
+  imageSources: string[],
+  outputPath: string,
+  settings: Partial<ImageSettings> = defaultImageSettings
+) {
   const uniqueSources = Array.from(new Set(imageSources.filter(isRemoteImageSource)));
   if (uniqueSources.length === 0) return {};
 
@@ -125,8 +176,15 @@ export async function copyRemoteImagesToBuild(imageSources: string[], outputPath
 
     const originalName = originalNameFromUrl(source, mimeType);
     const basename = ensureSlug(path.basename(originalName, path.extname(originalName)), "image");
-    const filename = `${basename}-${nanoid(10)}${extensionFor(originalName, mimeType)}`;
-    await writeFile(path.join(mediaDir, filename), bytes);
+    const optimized = await optimizeImageBytes({
+      bytes,
+      mimeType,
+      originalName,
+      settings: normalizeImageSettings(settings),
+      role: "article",
+    });
+    const filename = `${basename}-${nanoid(10)}${extensionFor(originalName, optimized.mimeType)}`;
+    await writeFile(path.join(mediaDir, filename), optimized.bytes);
     map[source] = `/assets/media/${filename}`;
   }
 
@@ -261,6 +319,96 @@ export async function readMediaAssetBytes(id: string) {
   return readFile(path.resolve(storageDir(), asset.storagePath));
 }
 
+async function imageSettingsForBlog(blogId?: string | null): Promise<ImageSettings> {
+  if (!blogId) return defaultImageSettings;
+  const blog = await prisma.blog.findUnique({
+    where: { id: blogId },
+    select: {
+      imageOptimizationEnabled: true,
+      imageOutputFormat: true,
+      imageQuality: true,
+      imageMaxWidth: true,
+      logoMaxWidth: true,
+    },
+  });
+  return normalizeImageSettings(blog || defaultImageSettings);
+}
+
+function imageSettingsFromBlog(blog: Partial<ImageSettings>): ImageSettings {
+  return normalizeImageSettings(blog);
+}
+
+function normalizeImageSettings(settings: Partial<ImageSettings> | null | undefined): ImageSettings {
+  return {
+    imageOptimizationEnabled: settings?.imageOptimizationEnabled ?? defaultImageSettings.imageOptimizationEnabled,
+    imageOutputFormat: settings?.imageOutputFormat ?? defaultImageSettings.imageOutputFormat,
+    imageQuality: clampInt(settings?.imageQuality, 40, 100, defaultImageSettings.imageQuality),
+    imageMaxWidth: clampInt(settings?.imageMaxWidth, 480, 3200, defaultImageSettings.imageMaxWidth),
+    logoMaxWidth: clampInt(settings?.logoMaxWidth, 120, 1200, defaultImageSettings.logoMaxWidth),
+  };
+}
+
+async function optimizeImageBytes(input: {
+  bytes: Buffer;
+  mimeType: string;
+  originalName: string;
+  settings: Partial<ImageSettings>;
+  role: ImageRole;
+}) {
+  const settings = normalizeImageSettings(input.settings);
+  if (!settings.imageOptimizationEnabled || !isOptimizableRaster(input.mimeType)) {
+    const metadata = await safeImageMetadata(input.bytes);
+    return {
+      bytes: input.bytes,
+      mimeType: input.mimeType,
+      changed: false,
+      width: metadata.width,
+      height: metadata.height,
+    };
+  }
+
+  const sourceMetadata = await safeImageMetadata(input.bytes);
+  const maxWidth = input.role === "logo" ? settings.logoMaxWidth : settings.imageMaxWidth;
+  const targetMimeType = outputMimeType(input.mimeType, settings.imageOutputFormat);
+  const shouldResize = Boolean(sourceMetadata.width && sourceMetadata.width > maxWidth);
+  const shouldConvert = targetMimeType !== input.mimeType;
+  const shouldRecompress = input.mimeType === "image/jpeg" || input.mimeType === "image/png" || input.mimeType === "image/webp";
+
+  if (!shouldResize && !shouldConvert && !shouldRecompress) {
+    return {
+      bytes: input.bytes,
+      mimeType: input.mimeType,
+      changed: false,
+      width: sourceMetadata.width,
+      height: sourceMetadata.height,
+    };
+  }
+
+  let pipeline = sharp(input.bytes, { failOn: "none" }).rotate();
+  if (shouldResize) {
+    pipeline = pipeline.resize({ width: maxWidth, withoutEnlargement: true });
+  }
+
+  const quality = settings.imageQuality;
+  if (targetMimeType === "image/webp") {
+    pipeline = pipeline.webp({ quality, effort: 4 });
+  } else if (targetMimeType === "image/jpeg") {
+    pipeline = pipeline.jpeg({ quality, mozjpeg: true });
+  } else if (targetMimeType === "image/png") {
+    pipeline = pipeline.png({ quality, compressionLevel: 9 });
+  }
+
+  const bytes = await pipeline.toBuffer();
+  const outputMetadata = await safeImageMetadata(bytes);
+  return {
+    bytes,
+    mimeType: targetMimeType,
+    changed: true,
+    width: outputMetadata.width,
+    height: outputMetadata.height,
+  };
+}
+
 function collectMediaIdsFromJson(value: unknown, ids: Set<string>) {
   if (!value) return;
   if (Array.isArray(value)) {
@@ -338,16 +486,60 @@ function mimeTypeFromUrl(source: string) {
   return null;
 }
 
+function isBlogLogoAsset(blog: BuildBlogImageSettings, assetId: string) {
+  return [blog.logoMediaId, blog.faviconMediaId, blog.organizationLogoMediaId].filter(Boolean).includes(assetId);
+}
+
+function isOptimizableRaster(mimeType: string) {
+  return mimeType === "image/jpeg" || mimeType === "image/png" || mimeType === "image/webp";
+}
+
+function outputMimeType(inputMimeType: string, format: ImageOutputFormat) {
+  if (format === "WEBP") return "image/webp";
+  if (format === "JPEG") return "image/jpeg";
+  if (format === "PNG") return "image/png";
+  return inputMimeType;
+}
+
+function filenameWithMimeType(filename: string, mimeType: string) {
+  const basename = ensureSlug(path.basename(filename, path.extname(filename)), "image");
+  return `${basename}${extensionFor(filename, mimeType)}`;
+}
+
+async function safeImageMetadata(bytes: Buffer) {
+  try {
+    const metadata = await sharp(bytes, { failOn: "none" }).metadata();
+    return {
+      width: metadata.width || null,
+      height: metadata.height || null,
+    };
+  } catch {
+    return { width: null, height: null };
+  }
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
 function absoluteAppAssetUrl(publicPath: string) {
   const normalizedPath = publicPath.startsWith("/") ? publicPath : `/${publicPath}`;
   return `${appUrl().replace(/\/$/, "")}${normalizedPath}`;
 }
 
 function extensionFor(originalName: string, mimeType: string) {
+  const fromMime = extensionForMime(mimeType);
+  if (fromMime) return fromMime;
   const fromName = path.extname(originalName).toLowerCase();
   if ([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(fromName)) {
     return fromName === ".jpeg" ? ".jpg" : fromName;
   }
+  return "";
+}
+
+function extensionForMime(mimeType: string) {
   if (mimeType === "image/jpeg") return ".jpg";
   if (mimeType === "image/png") return ".png";
   if (mimeType === "image/webp") return ".webp";

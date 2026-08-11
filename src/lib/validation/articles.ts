@@ -14,6 +14,7 @@ export const articleInputSchema = z.object({
   noindex: z.boolean().default(false),
   tags: z.array(z.string().min(1)).default([]),
   source: z.enum(["MANUAL", "BABYLOVEGROWTH", "MCP", "IMPORT"]).default("MANUAL"),
+  sourceExternalId: z.string().optional().nullable(),
 });
 
 export type ArticleInput = z.infer<typeof articleInputSchema>;

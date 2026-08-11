@@ -39,6 +39,7 @@ export async function createArticle(blogId: string, input: ArticleInput) {
       title: parsed.title,
       slug: parsed.slug,
       source: parsed.source,
+      sourceExternalId: parsed.sourceExternalId,
       markdown: parsed.markdown,
       htmlCache,
       excerpt: parsed.excerpt || excerptFromMarkdown(parsed.markdown),
@@ -79,6 +80,7 @@ export async function updateArticle(id: string, input: Partial<ArticleInput>) {
       noindex: input.noindex ?? existing.noindex,
       tags: input.tags ?? (await articleTagNames(id)),
       source: input.source ?? existing.source,
+      sourceExternalId: input.sourceExternalId === undefined ? existing.sourceExternalId : input.sourceExternalId,
     },
     existing.blog.baseUrl,
     existing.blog.defaultAuthorName
@@ -89,6 +91,7 @@ export async function updateArticle(id: string, input: Partial<ArticleInput>) {
     data: {
       title: merged.title,
       slug: merged.slug,
+      sourceExternalId: merged.sourceExternalId,
       markdown: merged.markdown,
       htmlCache,
       excerpt: merged.excerpt || excerptFromMarkdown(merged.markdown),

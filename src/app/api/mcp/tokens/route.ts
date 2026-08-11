@@ -10,7 +10,12 @@ export const dynamic = "force-dynamic";
 
 const tokenSchema = z.object({
   name: z.string().min(2),
-  blogScopeJson: z.unknown().optional().nullable(),
+  blogScopeJson: z
+    .object({
+      blogIds: z.array(z.string().min(1)).min(1),
+    })
+    .optional()
+    .nullable(),
   permissionsJson: z.array(z.string()).default(defaultMcpPermissions),
 });
 
@@ -37,6 +42,14 @@ export async function POST(request: Request) {
   if (auth.response) return auth.response;
   try {
     const input = tokenSchema.parse(await request.json());
+    if (input.blogScopeJson?.blogIds?.length) {
+      const count = await prisma.blog.count({
+        where: { id: { in: input.blogScopeJson.blogIds } },
+      });
+      if (count !== input.blogScopeJson.blogIds.length) {
+        throw new Error("One or more selected MCP blog scopes do not exist.");
+      }
+    }
     const token = createOpaqueToken("aeo_mcp");
     const record = await prisma.mcpToken.create({
       data: {

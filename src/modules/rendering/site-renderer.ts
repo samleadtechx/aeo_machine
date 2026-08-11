@@ -94,19 +94,26 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
 
     const articles = blog.articles as ArticleWithTags[];
     const funnels = blog.funnels as FunnelWithRules[];
-    const referencedMediaIds = await collectReferencedMediaIds(blog.id, { articles, funnels });
-    const mediaMap = publicAssetMap(blog, await copyMediaAssetsToBuild(blog.id, referencedMediaIds, outputPath));
+    const referencedMediaIds = Array.from(
+      new Set([
+        ...(await collectReferencedMediaIds(blog.id, { articles, funnels })),
+        blog.logoMediaId,
+        blog.faviconMediaId,
+        blog.organizationLogoMediaId,
+      ].filter(Boolean) as string[])
+    );
+    const mediaMap = publicAssetMap(blog, await copyMediaAssetsToBuild(blog, referencedMediaIds, outputPath));
     const remoteImageSources = collectRemoteImageSources({ articles, funnels }).filter((source) => !mediaMap[source]);
-    const imageSourceMap = publicAssetMap(blog, await copyRemoteImagesToBuild(remoteImageSources, outputPath));
-    await writeFile(path.join(outputPath, "index.html"), renderIndexPage(blog, articles, renderOptions), "utf8");
+    const imageSourceMap = publicAssetMap(blog, await copyRemoteImagesToBuild(remoteImageSources, outputPath, blog));
+    await writeFile(path.join(outputPath, "index.html"), renderIndexPage(blog, articles, renderOptions, mediaMap), "utf8");
     await writeFile(path.join(outputPath, "robots.txt"), renderRobots(blog), "utf8");
     await writeFile(path.join(outputPath, "rss.xml"), renderRss(blog, articles, renderOptions), "utf8");
     await writeFile(path.join(outputPath, "sitemap.xml"), renderSitemap(blog, articles, funnels, renderOptions), "utf8");
     if (renderOptions.htaccessEnabled) {
       await writeFile(path.join(outputPath, ".htaccess"), renderHtaccess(blog), "utf8");
     }
-    await writeFile(path.join(outputPath, "privacy.html"), renderLegalPage(blog, "Privacy Policy"), "utf8");
-    await writeFile(path.join(outputPath, "terms.html"), renderLegalPage(blog, "Terms of Service"), "utf8");
+    await writeFile(path.join(outputPath, "privacy.html"), renderLegalPage(blog, "Privacy Policy", mediaMap), "utf8");
+    await writeFile(path.join(outputPath, "terms.html"), renderLegalPage(blog, "Terms of Service", mediaMap), "utf8");
     await writeFile(path.join(outputPath, "track", "collect.php"), renderTrackPhp(trackingEndpoint, trackingSecret), "utf8");
 
     for (const article of articles) {
@@ -118,7 +125,13 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
     for (const tag of tags) {
       await writeFile(
         path.join(outputPath, "tags", `${tag.slug}.html`),
-        renderTagPage(blog, tag, articles.filter((article) => article.tags.some((entry) => entry.tag.slug === tag.slug)), renderOptions),
+        renderTagPage(
+          blog,
+          tag,
+          articles.filter((article) => article.tags.some((entry) => entry.tag.slug === tag.slug)),
+          renderOptions,
+          mediaMap
+        ),
         "utf8"
       );
     }
@@ -223,6 +236,7 @@ async function renderArticlePage(
 
   return pageShell({
     blog,
+    mediaMap,
     title: article.metaTitle || article.title,
     description: article.metaDescription || article.excerpt || "",
     canonical,
@@ -275,9 +289,10 @@ function firstMarkdownImageSource(markdown: string) {
   return match?.[1] || null;
 }
 
-function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions) {
+function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
   return pageShell({
     blog,
+    mediaMap,
     title: `${blog.brandName} Blog`,
     description: `${blog.brandName} articles, guides, and resources.`,
     canonical: blog.baseUrl,
@@ -294,9 +309,10 @@ function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: Rende
   });
 }
 
-function renderTagPage(blog: Blog, tag: Tag, articles: ArticleWithTags[], options: RenderOptions) {
+function renderTagPage(blog: Blog, tag: Tag, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
   return pageShell({
     blog,
+    mediaMap,
     title: `${tag.name} Articles | ${blog.brandName}`,
     description: `Articles tagged ${tag.name} from ${blog.brandName}.`,
     canonical: joinUrl(blog.baseUrl, options.cleanUrls ? `tags/${tag.slug}/` : `tags/${tag.slug}.html`),
@@ -312,9 +328,10 @@ function renderTagPage(blog: Blog, tag: Tag, articles: ArticleWithTags[], option
   });
 }
 
-function renderLegalPage(blog: Blog, title: string) {
+function renderLegalPage(blog: Blog, title: string, mediaMap: BuildMediaMap) {
   return pageShell({
     blog,
+    mediaMap,
     title: `${title} | ${blog.brandName}`,
     description: `${title} for ${blog.brandName}.`,
     canonical: joinUrl(blog.baseUrl, title.toLowerCase().startsWith("privacy") ? "privacy.html" : "terms.html"),
@@ -335,12 +352,15 @@ function renderLegalPage(blog: Blog, title: string) {
 
 function pageShell(props: {
   blog: Blog;
+  mediaMap?: BuildMediaMap;
   title: string;
   description: string;
   canonical: string;
   content: string;
 }) {
-  const { blog, title, description, canonical, content } = props;
+  const { blog, mediaMap = {}, title, description, canonical, content } = props;
+  const logoUrl = blog.logoMediaId ? mediaMap[blog.logoMediaId] : null;
+  const faviconUrl = (blog.faviconMediaId ? mediaMap[blog.faviconMediaId] : null) || logoUrl;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -355,11 +375,14 @@ function pageShell(props: {
   <meta property="og:url" content="${escapeAttribute(canonical)}" />
   <meta property="og:type" content="article" />
   <meta name="twitter:card" content="summary_large_image" />
+  ${faviconUrl ? `<link rel="icon" href="${escapeAttribute(faviconUrl)}" />` : ""}
   ${themeCss(blog)}
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="${escapeAttribute(publicPath(blog))}">${escapeHtml(blog.brandName)}</a>
+    <a class="brand ${logoUrl ? "has-logo" : ""}" href="${escapeAttribute(publicPath(blog))}">
+      ${logoUrl ? `<img class="brand-logo" src="${escapeAttribute(logoUrl)}" alt="${escapeAttribute(blog.brandName)}" />` : escapeHtml(blog.brandName)}
+    </a>
     <nav><a href="${escapeAttribute(publicPath(blog))}">Articles</a><a href="${escapeAttribute(publicPath(blog, "privacy.html"))}">Privacy</a><a href="${escapeAttribute(publicPath(blog, "terms.html"))}">Terms</a></nav>
   </header>
   <main>${content}</main>
@@ -379,7 +402,9 @@ body{margin:0;font-family:${escapeHtml(blog.fontFamily)};background:var(--shell)
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
 .site-header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);border-bottom:1px solid var(--line);backdrop-filter:blur(10px);display:flex;justify-content:space-between;gap:18px;align-items:center;padding:14px clamp(16px,4vw,42px)}
-.brand{font-weight:950;color:var(--ink)}
+.brand{font-weight:950;color:var(--ink);display:inline-flex;align-items:center;min-height:40px;max-width:260px}
+.brand.has-logo{height:44px}
+.brand-logo{display:block;width:auto;height:auto;max-width:220px;max-height:44px;object-fit:contain}
 nav{display:flex;gap:16px;font-size:14px}
 main{max-width:1060px;margin:0 auto;padding:30px 16px 56px}
 .index-head{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--line);padding:18px 0 24px;margin-bottom:22px}

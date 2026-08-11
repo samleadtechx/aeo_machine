@@ -40,6 +40,7 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
     metaDescription: payload.metaDescription,
     tags: payload.tags?.length ? payload.tags : ["BabyLoveGrowth", "Imported"],
     source: "BABYLOVEGROWTH",
+    sourceExternalId: externalArticleId,
     noindex: false,
   });
 

@@ -12,6 +12,8 @@ type MediaRow = {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
   publicPath: string;
   altText?: string | null;
   createdAt: string;
@@ -54,7 +56,7 @@ export function MediaManager({
     }
     formRef.current?.reset();
     await refresh(blogId);
-    setMessage(`Uploaded ${data.media.originalName}.`);
+    setMessage(`Uploaded ${data.media.originalName} (${Math.round(data.media.sizeBytes / 1024)} KB).`);
   }
 
   return (
@@ -107,6 +109,7 @@ export function MediaManager({
               <strong>{asset.originalName}</strong>
               <div className="muted">
                 {asset.mimeType} / {Math.round(asset.sizeBytes / 1024)} KB
+                {asset.width && asset.height ? ` / ${asset.width}x${asset.height}` : ""}
               </div>
             </div>
             <CopyValue label="Media ID" value={asset.id} />

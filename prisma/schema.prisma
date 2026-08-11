@@ -139,6 +139,13 @@ enum PublicWebhookType {
   BABYLOVEGROWTH
 }
 
+enum ImageOutputFormat {
+  ORIGINAL
+  WEBP
+  JPEG
+  PNG
+}
+
 enum SeoIssueSeverity {
   BLOCKER
   WARNING
@@ -183,6 +190,11 @@ model Blog {
   robotsPolicy            String                  @default("index,follow")
   indexNowEnabled         Boolean                 @default(false)
   indexNowKey             String?
+  imageOptimizationEnabled Boolean                @default(true)
+  imageOutputFormat       ImageOutputFormat       @default(WEBP)
+  imageQuality            Int                     @default(82)
+  imageMaxWidth           Int                     @default(1600)
+  logoMaxWidth            Int                     @default(480)
   themeKey                String                  @default("default-saas-blog")
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
@@ -259,7 +271,7 @@ model Article {
   babyLoveGrowthImports BabyLoveGrowthImport[]
 
   @@unique([blogId, slug])
-  @@unique([source, sourceExternalId])
+  @@unique([blogId, source, sourceExternalId])
   @@index([blogId, status])
 }
 

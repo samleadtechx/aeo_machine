@@ -7,15 +7,28 @@ type McpTokenRow = {
   id: string;
   name: string;
   enabled: boolean;
+  blogScopeJson?: unknown;
   permissionsJson: unknown;
   lastUsedAt?: string | null;
   createdAt: string;
 };
 
-export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[] }) {
+type BlogOption = {
+  id: string;
+  name: string;
+};
+
+export function McpTokenManager({
+  initialTokens,
+  initialBlogs,
+}: {
+  initialTokens: McpTokenRow[];
+  initialBlogs: BlogOption[];
+}) {
   const [tokens, setTokens] = useState(initialTokens);
   const [newToken, setNewToken] = useState("");
   const [name, setName] = useState("Draft writer token");
+  const [blogId, setBlogId] = useState(initialBlogs[0]?.id || "");
 
   async function refresh() {
     const response = await fetch("/api/mcp/tokens");
@@ -27,7 +40,10 @@ export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[
     const response = await fetch("/api/mcp/tokens", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        blogScopeJson: blogId ? { blogIds: [blogId] } : null,
+      }),
     });
     const data = await response.json();
     if (response.ok) {
@@ -56,6 +72,7 @@ export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[
           <thead>
             <tr>
               <th>Name</th>
+              <th>Scope</th>
               <th>Status</th>
               <th>Last used</th>
               <th>Action</th>
@@ -65,6 +82,7 @@ export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[
             {tokens.map((token) => (
               <tr key={token.id}>
                 <td>{token.name}</td>
+                <td>{scopeLabel(token.blogScopeJson, initialBlogs)}</td>
                 <td><span className={`badge ${token.enabled ? "pass" : "warn"}`}>{token.enabled ? "Enabled" : "Disabled"}</span></td>
                 <td>{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : "Never"}</td>
                 <td>
@@ -83,6 +101,17 @@ export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[
           <span>Name</span>
           <input className="input" value={name} onChange={(event) => setName(event.target.value)} />
         </label>
+        <label className="field">
+          <span>Blog scope</span>
+          <select className="select" value={blogId} onChange={(event) => setBlogId(event.target.value)}>
+            {initialBlogs.map((blog) => (
+              <option key={blog.id} value={blog.id}>
+                {blog.name}
+              </option>
+            ))}
+            <option value="">All blogs</option>
+          </select>
+        </label>
         <button className="btn primary" type="button" onClick={create}>
           <Plus size={16} />
           Create Token
@@ -100,4 +129,19 @@ export function McpTokenManager({ initialTokens }: { initialTokens: McpTokenRow[
       </section>
     </div>
   );
+}
+
+function scopeLabel(scope: unknown, blogs: BlogOption[]) {
+  const blogIds = scopedBlogIds(scope);
+  if (!blogIds) return "All blogs";
+  return blogIds
+    .map((id) => blogs.find((blog) => blog.id === id)?.name || id)
+    .join(", ");
+}
+
+function scopedBlogIds(scope: unknown) {
+  if (!scope || typeof scope !== "object") return null;
+  const blogIds = (scope as { blogIds?: unknown }).blogIds;
+  if (!Array.isArray(blogIds) || blogIds.length === 0) return null;
+  return blogIds.map(String);
 }

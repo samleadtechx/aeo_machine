@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { CopyValue } from "@/components/admin/CopyValue";
+import { ImageOptimizationManager } from "@/components/admin/ImageOptimizationManager";
 import { MediaManager } from "@/components/admin/MediaManager";
 import { OutboundWebhookManager } from "@/components/admin/OutboundWebhookManager";
 import { appUrl, publicWebhookBaseUrl, storageDir } from "@/lib/env";
@@ -103,6 +104,11 @@ export default async function SettingsPage() {
       ) : null}
 
       <MediaManager
+        initialBlogs={JSON.parse(JSON.stringify(blogs))}
+        initialMedia={JSON.parse(JSON.stringify(media))}
+      />
+
+      <ImageOptimizationManager
         initialBlogs={JSON.parse(JSON.stringify(blogs))}
         initialMedia={JSON.parse(JSON.stringify(media))}
       />

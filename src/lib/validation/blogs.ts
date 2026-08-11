@@ -9,15 +9,23 @@ export const blogInputSchema = z.object({
   language: z.string().default("en"),
   timezone: z.string().default("America/Chicago"),
   brandName: z.string().min(1),
+  logoMediaId: z.string().optional().nullable(),
+  faviconMediaId: z.string().optional().nullable(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563eb"),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0f766e"),
   fontFamily: z.string().min(1).default("Inter, ui-sans-serif, system-ui"),
   defaultAuthorName: z.string().min(1).default("Editorial Team"),
   defaultAuthorBio: z.string().optional().nullable(),
   organizationName: z.string().optional().nullable(),
+  organizationLogoMediaId: z.string().optional().nullable(),
   robotsPolicy: z.string().default("index,follow"),
   indexNowEnabled: z.boolean().default(false),
   indexNowKey: z.string().optional().nullable(),
+  imageOptimizationEnabled: z.boolean().default(true),
+  imageOutputFormat: z.enum(["ORIGINAL", "WEBP", "JPEG", "PNG"]).default("WEBP"),
+  imageQuality: z.coerce.number().int().min(40).max(100).default(82),
+  imageMaxWidth: z.coerce.number().int().min(480).max(3200).default(1600),
+  logoMaxWidth: z.coerce.number().int().min(120).max(1200).default(480),
 });
 
 export const deploymentTargetInputSchema = z.object({
