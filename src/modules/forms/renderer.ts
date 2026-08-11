@@ -294,30 +294,37 @@ function renderField(field: FunnelConfig["leadFields"][number]) {
 
 function funnelCss(rootId: string, primary: string, accent: string, embedded: boolean) {
   return `<style>
-#${rootId}{--aeo-primary:${primary};--aeo-accent:${accent};--aeo-ink:#172033;--aeo-muted:#5a6475;--aeo-line:#dfe6f0;--aeo-panel:#ffffff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--aeo-ink);${embedded ? "margin:28px 0;" : "max-width:1050px;margin:20px auto;padding:0 16px;"}}
+#${rootId}{--aeo-primary:${primary};--aeo-accent:${accent};--aeo-ink:#172033;--aeo-muted:#5a6475;--aeo-line:#dfe6f0;--aeo-panel:#ffffff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:var(--aeo-ink);${embedded ? "margin:34px 0;padding:18px;border:1px solid var(--aeo-line);border-left:4px solid var(--aeo-accent);border-radius:8px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);box-shadow:0 18px 40px rgba(23,32,51,.06);" : "max-width:1050px;margin:20px auto;padding:0 16px;"}}
 .aeo-standalone{margin:0;background:#f4f7fb}
 #${rootId} *{box-sizing:border-box}
-#${rootId} .aeo-progress{height:8px;background:#e6edf5;border-radius:999px;overflow:hidden}
+#${rootId} .aeo-progress{height:6px;background:#e6edf5;border-radius:999px;overflow:hidden}
 #${rootId} .aeo-progress>div{height:100%;width:0;background:var(--aeo-accent);transition:width .25s ease}
-#${rootId} .aeo-progress-top{margin-bottom:12px}
-#${rootId} .aeo-progress-bottom{margin-top:12px}
-#${rootId} .aeo-funnel-top{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 12px}
-#${rootId} .aeo-kicker{color:var(--aeo-accent);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
-#${rootId} .aeo-step,.aeo-note{color:var(--aeo-muted);font-size:13px}
-#${rootId} .aeo-funnel-panel{background:var(--aeo-panel);border:1px solid var(--aeo-line);border-radius:8px;box-shadow:0 18px 45px rgba(23,32,51,.08);padding:24px 18px}
-#${rootId} .aeo-center{max-width:760px;margin:0 auto;text-align:center}
-#${rootId} h2{font-size:clamp(26px,4vw,42px);line-height:1.08;margin:8px 0 12px;color:var(--aeo-ink);letter-spacing:0}
-#${rootId} p{color:var(--aeo-muted);font-size:17px;line-height:1.45;margin:0 0 16px}
-#${rootId} .aeo-pill{display:inline-flex;align-items:center;border:1px solid color-mix(in srgb,var(--aeo-accent) 22%,white);background:color-mix(in srgb,var(--aeo-accent) 10%,white);color:var(--aeo-accent);font-size:12px;font-weight:900;border-radius:999px;padding:7px 11px;margin-bottom:8px}
+#${rootId} .aeo-progress-top{margin-bottom:14px}
+#${rootId} .aeo-progress-bottom{display:none}
+#${rootId} .aeo-funnel-top{display:flex;align-items:center;justify-content:space-between;padding:0 0 14px}
+#${rootId} .aeo-kicker{color:var(--aeo-accent);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+#${rootId} .aeo-step,#${rootId} .aeo-note{color:var(--aeo-muted);font-size:13px}
+#${rootId} .aeo-funnel-panel{${embedded ? "background:transparent;border:0;border-radius:8px;box-shadow:none;padding:6px 0 2px" : "background:var(--aeo-panel);border:1px solid var(--aeo-line);border-radius:8px;box-shadow:0 18px 45px rgba(23,32,51,.08);padding:24px 18px"}}
+#${rootId} .aeo-center{max-width:760px;${embedded ? "margin:0;text-align:left" : "margin:0 auto;text-align:center"}}
+#${rootId} h2{font-size:${embedded ? "clamp(24px,3.2vw,34px)" : "clamp(26px,4vw,42px)"};line-height:1.12;margin:8px 0 10px;color:var(--aeo-ink);letter-spacing:0}
+#${rootId} p{color:var(--aeo-muted);font-size:16px;line-height:1.5;margin:0 0 16px}
+#${rootId} .aeo-pill{display:inline-flex;align-items:center;border:1px solid color-mix(in srgb,var(--aeo-accent) 22%,white);background:color-mix(in srgb,var(--aeo-accent) 10%,white);color:var(--aeo-accent);font-size:12px;font-weight:900;border-radius:999px;padding:6px 10px;margin-bottom:8px}
 #${rootId} .aeo-primary{border:0;background:var(--aeo-primary);color:#fff;font-weight:900;border-radius:8px;padding:13px 18px;min-height:46px;cursor:pointer}
 #${rootId} .aeo-primary:hover{filter:brightness(.94)}
-#${rootId} .aeo-question-head{text-align:center;max-width:820px;margin:0 auto}
-#${rootId} .aeo-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px auto 0;max-width:760px}
-#${rootId} .aeo-choice{border:1px solid var(--aeo-line);border-radius:8px;background:#fff;overflow:hidden;text-align:left;cursor:pointer}
-#${rootId} .aeo-choice:hover{border-color:var(--aeo-accent);box-shadow:0 12px 30px rgba(23,32,51,.12)}
-#${rootId} .aeo-choice-media{aspect-ratio:4/2.7;background:#eef3f9;display:flex;align-items:center;justify-content:center;color:var(--aeo-muted);font-weight:800}
+#${rootId} .aeo-question-head{text-align:${embedded ? "left" : "center"};max-width:820px;${embedded ? "margin:0" : "margin:0 auto"}}
+#${rootId} .aeo-question-head h2{max-width:900px}
+#${rootId} .aeo-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;${embedded ? "margin:18px 0 0" : "margin:18px auto 0"};max-width:900px}
+#${rootId} .aeo-choice{align-items:center;border:1px solid var(--aeo-line);border-radius:8px;background:#fff;color:var(--aeo-ink);cursor:pointer;display:grid;gap:12px;grid-template-columns:auto minmax(0,1fr);min-height:94px;padding:14px;text-align:left;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease,background .18s ease}
+#${rootId} .aeo-choice:hover{background:#fbfdff;border-color:var(--aeo-accent);box-shadow:0 12px 28px rgba(23,32,51,.1);transform:translateY(-1px)}
+#${rootId} .aeo-choice:focus-visible{outline:3px solid color-mix(in srgb,var(--aeo-accent) 20%,transparent);outline-offset:2px}
+#${rootId} .aeo-choice.has-media{grid-template-columns:104px minmax(0,1fr)}
+#${rootId} .aeo-choice-media{background:#eef3f9;border:1px solid #d9e4f1;border-radius:8px;display:block;height:76px;overflow:hidden;width:104px}
 #${rootId} .aeo-choice-media img{width:100%;height:100%;display:block;object-fit:cover}
-#${rootId} .aeo-choice-label{padding:12px 13px;background:var(--aeo-primary);color:#fff;font-weight:900;min-height:58px;display:flex;align-items:center;justify-content:center;text-align:center}
+#${rootId} .aeo-choice-icon{align-items:center;background:color-mix(in srgb,var(--aeo-accent) 10%,white);border:1px solid color-mix(in srgb,var(--aeo-accent) 22%,white);border-radius:8px;color:var(--aeo-accent);display:flex;height:48px;justify-content:center;width:48px}
+#${rootId} .aeo-choice-icon svg{display:block;height:24px;width:24px}
+#${rootId} .aeo-choice-copy{display:grid;gap:3px;min-width:0}
+#${rootId} .aeo-choice-label{color:var(--aeo-ink);font-weight:900;line-height:1.2}
+#${rootId} .aeo-choice-hint{color:var(--aeo-muted);font-size:13px;font-weight:750;line-height:1.35}
 #${rootId} .aeo-actions{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--aeo-line);padding-top:14px;margin-top:18px}
 #${rootId} .aeo-actions button{border:0;background:transparent;color:var(--aeo-muted);font-weight:800;cursor:pointer;padding:9px 6px}
 #${rootId} .aeo-result-box{border:1px solid var(--aeo-line);border-radius:8px;text-align:left;padding:16px;background:#fff}
@@ -330,7 +337,7 @@ function funnelCss(rootId: string, primary: string, accent: string, embedded: bo
 #${rootId} input:focus{outline:3px solid color-mix(in srgb,var(--aeo-accent) 20%,transparent);border-color:var(--aeo-accent)}
 #${rootId} .aeo-hp{position:absolute;left:-10000px}
 .aeo-legal{display:flex;justify-content:center;gap:16px;padding:8px 0 24px;font:13px system-ui}.aeo-legal a{color:#5a6475}
-@media(max-width:640px){#${rootId} .aeo-choice-grid{grid-template-columns:1fr}#${rootId} .aeo-funnel-panel{padding:18px 12px}}
+@media(max-width:640px){#${rootId}{padding:14px}#${rootId} .aeo-choice-grid{grid-template-columns:1fr}#${rootId} .aeo-funnel-panel{padding:4px 0}#${rootId} .aeo-choice.has-media{grid-template-columns:84px minmax(0,1fr)}#${rootId} .aeo-choice-media{height:66px;width:84px}}
 </style>`;
 }
 
@@ -361,6 +368,40 @@ function funnelScript(
   const state = { step: -1, answers: {}, result: null, eventId: crypto.randomUUID ? crypto.randomUUID() : 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2) };
   const $ = (selector) => root.querySelector(selector);
   const money = (value) => Number(value).toLocaleString('en-US', { style:'currency', currency: config.result.currency || 'USD', maximumFractionDigits:0 });
+  const iconSvg = (name) => {
+    const icons = {
+      check: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      search: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.2"/></svg>',
+      phone: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.5 4.5 10 7 8.2 9.2c1 2 2.6 3.6 4.6 4.6L15 12l2.5 2.5-1.4 3c-.3.7-1.1 1.1-1.8.9-4.5-1.1-7.9-4.5-9-9-.1-.7.2-1.5.9-1.8l1.3-3.1Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      shield: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.4-2.8 8.2-7 9.8-4.2-1.6-7-5.4-7-9.8V6l7-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      money: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M16.5 7.5c-.9-1-2.3-1.5-4.1-1.5-2.1 0-3.7 1-3.7 2.7 0 4.3 8.6 1.8 8.6 6.2 0 1.9-1.8 3.1-4.5 3.1-2 0-3.7-.7-4.8-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+      calendar: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3v4M17 3v4M4.5 9h15M6.5 5h11A2.5 2.5 0 0 1 20 7.5v10A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-10A2.5 2.5 0 0 1 6.5 5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+    };
+    return icons[name] || icons.check;
+  };
+  const choiceIcon = (option) => {
+    const text = String((option.value || '') + ' ' + (option.label || '')).toLowerCase();
+    if (text.includes('research')) return iconSvg('search');
+    if (text.includes('miss') || text.includes('call')) return iconSvg('phone');
+    if (text.includes('always') || text.includes('voicemail') || text.includes('fine')) return iconSvg('shield');
+    if (text.includes('300') || text.includes('value') || text.includes('$')) return iconSvg('money');
+    if (text.includes('book')) return iconSvg('calendar');
+    return iconSvg('check');
+  };
+  const choiceHint = (option) => {
+    const value = String(option.value || '');
+    const hints = {
+      owner: 'You can approve changes.',
+      not_owner: 'You are gathering options.',
+      miss_regular: 'Busy moments may leak jobs.',
+      miss_never: 'Good baseline to compare.',
+      value_high: 'Each missed call matters.',
+      value_low: 'Keep the estimate conservative.',
+      want_yes: 'Show the upside.',
+      want_no: 'No pressure, just compare.'
+    };
+    return hints[value] || 'Tap to choose this answer.';
+  };
   const show = (screen) => Object.entries(screens).forEach(([name, el]) => { if (el) el.hidden = name !== screen; });
   const progress = () => {
     const total = config.questions.length + 1;
@@ -382,9 +423,29 @@ function funnelScript(
     q.options.forEach((option) => {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'aeo-choice';
-      const media = option.imageUrl ? '<img src="' + option.imageUrl.replace(/"/g, '&quot;') + '" alt="" loading="lazy" />' : '<span>' + option.label + '</span>';
-      card.innerHTML = '<div class="aeo-choice-media">' + media + '</div><div class="aeo-choice-label">' + option.label + '</div>';
+      card.className = 'aeo-choice' + (option.imageUrl ? ' has-media' : '');
+      const visual = document.createElement('span');
+      if (option.imageUrl) {
+        visual.className = 'aeo-choice-media';
+        const img = document.createElement('img');
+        img.src = option.imageUrl;
+        img.alt = '';
+        img.loading = 'lazy';
+        visual.appendChild(img);
+      } else {
+        visual.className = 'aeo-choice-icon';
+        visual.innerHTML = choiceIcon(option);
+      }
+      const copy = document.createElement('span');
+      copy.className = 'aeo-choice-copy';
+      const label = document.createElement('span');
+      label.className = 'aeo-choice-label';
+      label.textContent = option.label;
+      const hint = document.createElement('span');
+      hint.className = 'aeo-choice-hint';
+      hint.textContent = choiceHint(option);
+      copy.append(label, hint);
+      card.append(visual, copy);
       card.addEventListener('click', () => { state.answers[q.id] = option.value; next(); });
       choices.appendChild(card);
     });
