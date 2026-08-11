@@ -304,11 +304,6 @@ export function ArticleWorkspace({
       const asset = data.media as MediaRow;
       setMedia((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
       insertImage(asset);
-      setForm((current) => ({
-        ...current,
-        heroMediaId: current.heroMediaId || asset.id,
-        heroAlt: current.heroAlt || asset.altText || asset.originalName,
-      }));
       notify("success", `Uploaded ${asset.originalName} and inserted it into the article.`);
     });
   }

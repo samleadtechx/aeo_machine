@@ -196,6 +196,7 @@ async function renderArticlePage(
   const articleBody = funnelEmbed ? injectFunnel(bodyHtml, funnelEmbed.html, funnelEmbed.placement) : bodyHtml;
   const publishedAt = article.publishedAt || article.createdAt;
   const heroUrl = article.heroMediaId ? mediaMap[article.heroMediaId] : null;
+  const renderHeroImage = Boolean(heroUrl && !firstBodyImageMatchesHero(article, mediaMap));
   const schema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -234,7 +235,7 @@ async function renderArticlePage(
           <div class="byline">By ${escapeHtml(article.authorName || blog.defaultAuthorName)} | ${escapeHtml(formatDate(publishedAt))}</div>
         </header>
         ${
-          heroUrl
+          renderHeroImage && heroUrl
             ? `<img class="hero-image" src="${escapeAttribute(heroUrl)}" alt="${escapeAttribute(article.heroAlt || article.title)}" loading="eager" />`
             : ""
         }
@@ -251,6 +252,27 @@ async function renderArticlePage(
       <script type="application/ld+json">${jsonScript(breadcrumb)}</script>
     `,
   });
+}
+
+function firstBodyImageMatchesHero(article: Pick<Article, "heroMediaId" | "markdown">, mediaMap: BuildMediaMap) {
+  if (!article.heroMediaId) return false;
+  const source = firstMarkdownImageSource(article.markdown);
+  if (!source) return false;
+
+  const heroUrl = mediaMap[article.heroMediaId];
+  return (
+    source === article.heroMediaId ||
+    source === `media:${article.heroMediaId}` ||
+    Boolean(heroUrl && source === heroUrl) ||
+    Boolean(heroUrl && mediaMap[source] === heroUrl)
+  );
+}
+
+function firstMarkdownImageSource(markdown: string) {
+  const match = markdown
+    .trimStart()
+    .match(/^!\[[^\]]*]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/);
+  return match?.[1] || null;
 }
 
 function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions) {
