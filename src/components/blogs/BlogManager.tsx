@@ -278,7 +278,7 @@ export function BlogManager({ initialBlogs }: { initialBlogs: BlogRow[] }) {
   }
 
   return (
-    <div className="blogs-workspace">
+    <div className={`blogs-workspace ${!createOpen && !selected ? "list-only-workspace" : ""}`}>
       <section className="panel panel-pad stack blogs-rail">
         <div className="blogs-rail-head">
           <div>

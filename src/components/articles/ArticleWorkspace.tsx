@@ -479,7 +479,7 @@ export function ArticleWorkspace({
   const wordCount = form.markdown.trim().split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className="article-workspace article-editor-workspace">
+    <div className={`article-workspace article-editor-workspace ${!editorOpen ? "list-only-workspace" : ""}`}>
       {toast ? (
         <div className={`toast ${toast.kind}`} role="status">
           {toast.kind === "error" ? <AlertCircle size={18} /> : <Check size={18} />}
