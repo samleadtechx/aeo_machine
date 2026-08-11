@@ -207,24 +207,34 @@ export function ArticleWorkspace({
 
   async function save() {
     await runBusy("save", async () => {
-      setMessage("");
-      setPublishResult(null);
-      const latestMarkdown = syncVisualEditor();
-      const payload = articlePayload({ ...form, markdown: latestMarkdown });
-      const response = await fetch(form.id ? `/api/articles/${form.id}` : `/api/blogs/${form.blogId}/articles`, {
-        method: form.id ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await safeJson(response);
-      if (!response.ok) {
-        notify("error", data.error || "Save failed.");
+      const saved = await persistDraft();
+      if (!saved.ok) {
+        notify("error", saved.error || "Save failed.");
         return;
       }
-      const savedId = data.article?.id || form.id;
-      await refresh(savedId);
       notify("success", "Article saved and SEO gate rechecked.");
     });
+  }
+
+  async function persistDraft(): Promise<{ ok: true; articleId: string } | { ok: false; error: string }> {
+    setMessage("");
+    setPublishResult(null);
+    const latestMarkdown = syncVisualEditor();
+    const draft = { ...form, markdown: latestMarkdown };
+    const payload = articlePayload(draft);
+    const response = await fetch(draft.id ? `/api/articles/${draft.id}` : `/api/blogs/${draft.blogId}/articles`, {
+      method: draft.id ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await safeJson(response);
+    if (!response.ok) {
+      return { ok: false, error: data.error || "Save failed." };
+    }
+    const savedId = data.article?.id || draft.id;
+    if (!savedId) return { ok: false, error: "Save finished, but no article id was returned." };
+    await refresh(savedId);
+    return { ok: true, articleId: savedId };
   }
 
   async function action(key: string, path: string, success: string) {
@@ -248,13 +258,19 @@ export function ArticleWorkspace({
     await runBusy("publish", async () => {
       setMessage("");
       setPublishResult(null);
-      const response = await fetch(`/api/articles/${form.id}/publish`, {
+      notify("info", "Saving latest edits before publishing...");
+      const saved = await persistDraft();
+      if (!saved.ok) {
+        notify("error", `Could not save before publishing: ${saved.error}`);
+        return;
+      }
+      const response = await fetch(`/api/articles/${saved.articleId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deploy: true }),
       });
       const data = await safeJson(response);
-      await refresh(form.id);
+      await refresh(saved.articleId);
       if (!response.ok) {
         setPublishResult({
           articleUrl: data.articleUrl,

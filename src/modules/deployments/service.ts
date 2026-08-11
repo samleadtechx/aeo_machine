@@ -54,11 +54,7 @@ export async function testDeploymentTarget(targetId: string) {
 
 export async function testDeploymentConnection(target: DeploymentConnectionTarget) {
   await withClient(target, async (client) => {
-    if (target.type === "SFTP") {
-      await client.list(target.remoteRootPath);
-    } else {
-      await client.cd(target.remoteRootPath);
-    }
+    await ensureRemoteRoot(client, target);
   });
   return { ok: true };
 }
@@ -159,13 +155,13 @@ async function uploadDirectory(root: string, target: DeploymentTarget, options: 
   const log: string[] = [];
   let deletedFiles = 0;
   await withClient(target, async (client) => {
+    await ensureRemoteRoot(client, target);
     if (options.cleanRemoteRoot) {
       deletedFiles += await cleanRemoteRoot(client, target, log);
     } else if (!target.htaccessEnabled && await removeRemoteHtaccess(client, target, log)) {
       deletedFiles += 1;
     }
     if (target.type === "SFTP") {
-      await ensureSftpDir(client, target.remoteRootPath);
       for (const file of files) {
         const relative = path.relative(root, file).split(path.sep).join("/");
         const remote = `${target.remoteRootPath.replace(/\/+$/, "")}/${relative}`;
@@ -178,7 +174,6 @@ async function uploadDirectory(root: string, target: DeploymentTarget, options: 
         log.push(`uploaded ${relative}`);
       }
     } else {
-      await client.ensureDir(target.remoteRootPath);
       for (const file of files) {
         const relative = path.relative(root, file).split(path.sep).join("/");
         const remoteDir = path.posix.dirname(relative);
@@ -197,6 +192,15 @@ async function uploadDirectory(root: string, target: DeploymentTarget, options: 
     }
   });
   return { uploadedFiles: files.length, skippedFiles: 0, deletedFiles, log };
+}
+
+async function ensureRemoteRoot(client: any, target: DeploymentConnectionTarget) {
+  if (target.type === "SFTP") {
+    await ensureSftpDir(client, target.remoteRootPath);
+    await client.list(target.remoteRootPath);
+    return;
+  }
+  await client.ensureDir(target.remoteRootPath);
 }
 
 function decorateUploadError(error: unknown, relative: string) {
