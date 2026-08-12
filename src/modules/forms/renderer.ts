@@ -51,7 +51,6 @@ export function renderFunnelHtml(options: RenderFunnelOptions) {
         </section>
         <section data-screen="question" hidden>
           <div class="aeo-question-head">
-            <p class="aeo-kicker" data-question-meta></p>
             <h2 data-question-title></h2>
             <p data-question-subtitle></p>
           </div>
@@ -418,7 +417,6 @@ function funnelScript(
   };
   const renderQuestion = () => {
     const q = config.questions[state.step];
-    $('[data-question-meta]').textContent = 'Question ' + (state.step + 1) + ' of ' + config.questions.length;
     $('[data-question-title]').textContent = q.title;
     $('[data-question-subtitle]').textContent = q.subtitle;
     const choices = $('[data-choices]');
