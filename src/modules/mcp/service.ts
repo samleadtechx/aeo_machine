@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/auth/tokens";
 import { createArticle, updateArticle } from "@/modules/articles/service";
 import type { FunnelInput } from "@/lib/validation/funnels";
+import { createMediaAsset, listMediaAssets } from "@/modules/media/service";
 import {
   createFunnel,
   getFunnel,
@@ -25,8 +26,12 @@ export const defaultMcpPermissions = [
   "forms.update",
   "forms.place",
   "forms.archive",
+  "media.read",
+  "media.upload",
   "leads.read_summary",
 ];
+
+const maxMcpMediaUploadBytes = 12 * 1024 * 1024;
 
 export async function authenticateMcpToken(authorization: string | null) {
   const token = authorization?.replace(/^Bearer\s+/i, "");
@@ -127,6 +132,44 @@ export async function handleMcpToolCall(authorization: string | null, request: M
         });
       }
       return listFunnels();
+    case "list_media_assets":
+      assertAnyPermission(permissions, ["media.read", "forms.read"]);
+      if (typeof args.blogId === "string") {
+        assertBlogScope(blogScope, args.blogId);
+        return (await listMediaAssets(args.blogId)).map(mcpMediaAsset);
+      }
+      if (blogScope) {
+        const assets = await prisma.mediaAsset.findMany({
+          where: { OR: [{ blogId: { in: blogScope } }, { blogId: null }] },
+          orderBy: { createdAt: "desc" },
+        });
+        return assets.map(mcpMediaAsset);
+      }
+      return (await listMediaAssets()).map(mcpMediaAsset);
+    case "upload_media_asset":
+      assertAnyPermission(permissions, ["media.upload", "forms.create", "forms.update"]);
+      assertBlogScope(blogScope, requiredStringArg(args, "blogId"));
+      {
+        const upload = await mediaUploadInput(args);
+        const media = await createMediaAsset({
+          blogId: requiredStringArg(args, "blogId"),
+          originalName: upload.filename,
+          mimeType: upload.mimeType,
+          bytes: upload.bytes,
+          altText: typeof args.altText === "string" ? args.altText : null,
+          role: args.role === "logo" ? "logo" : "article",
+        });
+        return {
+          ...mcpMediaAsset(media),
+          imageMediaId: media.id,
+          markdownToken: `media:${media.id}`,
+          funnelOptionJson: {
+            label: typeof args.optionLabel === "string" ? args.optionLabel : "Answer label",
+            value: typeof args.optionValue === "string" ? args.optionValue : "answer_value",
+            imageMediaId: media.id,
+          },
+        };
+      }
     case "get_funnel":
       assertPermission(permissions, "forms.read");
       {
@@ -202,6 +245,12 @@ function assertPermission(permissions: string[], permission: string) {
   }
 }
 
+function assertAnyPermission(permissions: string[], allowed: string[]) {
+  if (!allowed.some((permission) => permissions.includes(permission))) {
+    throw new Error(`MCP permission denied: one of ${allowed.join(", ")}`);
+  }
+}
+
 function scopedBlogIds(scope: unknown) {
   if (!scope || typeof scope !== "object") return null;
   const blogIds = (scope as { blogIds?: unknown }).blogIds;
@@ -246,4 +295,127 @@ function funnelConfigArg(value: unknown) {
 function funnelStatusArg(value: unknown, fallback?: FunnelInput["status"]) {
   if (value === "DRAFT" || value === "ACTIVE" || value === "ARCHIVED") return value;
   return fallback;
+}
+
+function mcpMediaAsset(asset: {
+  id: string;
+  blogId: string | null;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  publicPath: string;
+  altText: string | null;
+  createdAt: Date;
+}) {
+  return {
+    id: asset.id,
+    blogId: asset.blogId,
+    filename: asset.filename,
+    originalName: asset.originalName,
+    mimeType: asset.mimeType,
+    sizeBytes: asset.sizeBytes,
+    width: asset.width,
+    height: asset.height,
+    publicPath: asset.publicPath,
+    altText: asset.altText,
+    createdAt: asset.createdAt,
+  };
+}
+
+async function mediaUploadInput(args: Record<string, unknown>) {
+  if (typeof args.dataBase64 === "string" && args.dataBase64.trim()) {
+    return mediaUploadFromBase64(args);
+  }
+  if (typeof args.sourceUrl === "string" && args.sourceUrl.trim()) {
+    return mediaUploadFromUrl(args);
+  }
+  throw new Error("MCP argument required: dataBase64 or sourceUrl");
+}
+
+function mediaUploadFromBase64(args: Record<string, unknown>) {
+  const input = requiredStringArg(args, "dataBase64");
+  const dataUrl = input.match(/^data:([^;,]+);base64,(.+)$/i);
+  const mimeType = normalizedMimeType(dataUrl?.[1] || args.mimeType || mimeTypeFromFilename(String(args.filename || "")));
+  const base64 = dataUrl?.[2] || input;
+  if (!mimeType) throw new Error("MCP argument required: mimeType for base64 media uploads.");
+  if (!/^[a-z0-9+/=\s_-]+$/i.test(base64)) throw new Error("Invalid base64 media payload.");
+  const bytes = Buffer.from(base64.replace(/\s/g, ""), "base64");
+  assertMediaSize(bytes);
+  return {
+    bytes,
+    mimeType,
+    filename: filenameArg(args, mimeType),
+  };
+}
+
+async function mediaUploadFromUrl(args: Record<string, unknown>) {
+  const sourceUrl = requiredStringArg(args, "sourceUrl");
+  const url = new URL(sourceUrl);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("MCP sourceUrl must be http or https.");
+  }
+  const response = await fetch(url, { redirect: "follow" });
+  if (!response.ok) {
+    throw new Error(`Could not fetch MCP media source: HTTP ${response.status}.`);
+  }
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxMcpMediaUploadBytes) {
+    throw new Error("MCP media source is too large.");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assertMediaSize(bytes);
+  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() || "";
+  const mimeType = normalizedMimeType(args.mimeType || contentType || mimeTypeFromFilename(url.pathname));
+  if (!mimeType) throw new Error("Could not detect MCP media source image type.");
+  return {
+    bytes,
+    mimeType,
+    filename: filenameArg(args, mimeType, filenameFromUrl(url, mimeType)),
+  };
+}
+
+function assertMediaSize(bytes: Buffer) {
+  if (!bytes.length) throw new Error("MCP media upload is empty.");
+  if (bytes.length > maxMcpMediaUploadBytes) throw new Error("MCP media upload is too large.");
+}
+
+function filenameArg(args: Record<string, unknown>, mimeType: string, fallback = "funnel-image") {
+  const raw = typeof args.filename === "string" && args.filename.trim() ? args.filename.trim() : fallback;
+  const hasExtension = /\.[a-z0-9]{2,5}$/i.test(raw);
+  return hasExtension ? raw : `${raw}${extensionForMime(mimeType)}`;
+}
+
+function normalizedMimeType(value: unknown) {
+  const mimeType = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"].includes(mimeType)) {
+    return mimeType;
+  }
+  return null;
+}
+
+function mimeTypeFromFilename(filename: string) {
+  const extension = filename.split("?")[0]?.split("#")[0]?.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  if (extension === ".png") return "image/png";
+  if (extension === ".webp") return "image/webp";
+  if (extension === ".gif") return "image/gif";
+  if (extension === ".svg") return "image/svg+xml";
+  return null;
+}
+
+function filenameFromUrl(url: URL, mimeType: string) {
+  const basename = url.pathname.split("/").filter(Boolean).pop() || "funnel-image";
+  return /\.[a-z0-9]{2,5}$/i.test(basename) ? basename : `${basename}${extensionForMime(mimeType)}`;
+}
+
+function extensionForMime(mimeType: string) {
+  if (mimeType === "image/jpeg") return ".jpg";
+  if (mimeType === "image/png") return ".png";
+  if (mimeType === "image/webp") return ".webp";
+  if (mimeType === "image/gif") return ".gif";
+  if (mimeType === "image/svg+xml") return ".svg";
+  return "";
 }

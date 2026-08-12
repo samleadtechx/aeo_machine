@@ -130,7 +130,8 @@ export function McpTokenManager({
           </div>
         ) : null}
         <div className="notice">
-          MCP can read blogs/articles/funnels, create or update article drafts, create/update/archive funnels, and add placement rules.
+          MCP can read blogs/articles/funnels/media, upload real images for funnel choices, create or update
+          article drafts, create/update/archive funnels, and add placement rules.
           Publish and deploy permissions are intentionally absent.
         </div>
         <button className="btn" type="button" onClick={() => setInstructionsOpen(true)}>
@@ -265,12 +266,53 @@ Available tools:
 - update_article_draft
 - list_funnels
 - get_funnel
+- list_media_assets
+- upload_media_asset
 - create_funnel
 - update_funnel
 - set_funnel_status
 - archive_funnel
 - add_funnel_placement_rule
 - get_seo_requirements
+
+Upload a real funnel option image:
+Use this when you generate or source a real image for an answer choice. The response returns imageMediaId.
+
+curl -X POST "${endpointUrl}" \\
+  -H "Authorization: Bearer ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "tool": "upload_media_asset",
+    "arguments": {
+      "blogId": "${selectedBlog?.id || "BLOG_ID_FROM_list_blogs"}",
+      "filename": "actively-searching.png",
+      "mimeType": "image/png",
+      "altText": "Person actively searching on a laptop",
+      "optionLabel": "I am actively searching",
+      "optionValue": "actively_searching",
+      "dataBase64": "BASE64_IMAGE_BYTES_HERE"
+    }
+  }'
+
+You can also upload by URL:
+curl -X POST "${endpointUrl}" \\
+  -H "Authorization: Bearer ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "tool": "upload_media_asset",
+    "arguments": {
+      "blogId": "${selectedBlog?.id || "BLOG_ID_FROM_list_blogs"}",
+      "sourceUrl": "https://example.com/generated-image.png",
+      "filename": "open-to-offers.png",
+      "altText": "Professional reviewing new offers",
+      "optionLabel": "I am open to new offers",
+      "optionValue": "open_to_offers"
+    }
+  }'
+
+Use returned images in funnel config:
+Set each option.imageMediaId to the uploaded media ID.
+Call list_media_assets first when you want to reuse an existing uploaded image instead of creating a new one.
 
 Create article draft example:
 curl -X POST "${endpointUrl}" \\
@@ -307,7 +349,51 @@ curl -X POST "${endpointUrl}" \\
           "subtitle": "Answer 4 quick questions and get a simple estimate.",
           "startButton": "Start"
         },
-        "questions": []
+        "questions": [
+          {
+            "id": "situation",
+            "kicker": "Current situation",
+            "title": "What best describes your current situation?",
+            "subtitle": "Choose the closest match.",
+            "options": [
+              {
+                "label": "I am actively searching",
+                "value": "actively_searching",
+                "imageMediaId": "MEDIA_ID_FROM_upload_media_asset"
+              },
+              {
+                "label": "I am open to new offers",
+                "value": "open_to_offers",
+                "imageMediaId": "MEDIA_ID_FROM_upload_media_asset"
+              }
+            ]
+          }
+        ],
+        "result": {
+          "type": "formula",
+          "formulaKey": "missed_call_loss_v1",
+          "currency": "USD",
+          "constants": {
+            "missedCallsRegular": 6,
+            "missedCallsFloor": 1,
+            "highValuePerMissedCall": 450,
+            "lowValuePerMissedCall": 300,
+            "lossFactor": 0.6,
+            "subscriptionComparisonMonthly": 49
+          }
+        },
+        "leadFields": [
+          {
+            "name": "email",
+            "type": "email",
+            "required": true
+          }
+        ],
+        "submit": {
+          "buttonLabel": "Get my result",
+          "successMode": "message",
+          "redirectUrl": null
+        }
       },
       "styleJson": {
         "primaryColor": "#2563eb",

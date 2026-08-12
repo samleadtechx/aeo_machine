@@ -317,9 +317,12 @@ function funnelCss(rootId: string, primary: string, accent: string, embedded: bo
 #${rootId} .aeo-choice{align-items:center;border:1px solid var(--aeo-line);border-radius:8px;background:#fff;color:var(--aeo-ink);cursor:pointer;display:grid;gap:12px;grid-template-columns:auto minmax(0,1fr);min-height:94px;padding:14px;text-align:left;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease,background .18s ease}
 #${rootId} .aeo-choice:hover{background:#fbfdff;border-color:var(--aeo-accent);box-shadow:0 12px 28px rgba(23,32,51,.1);transform:translateY(-1px)}
 #${rootId} .aeo-choice:focus-visible{outline:3px solid color-mix(in srgb,var(--aeo-accent) 20%,transparent);outline-offset:2px}
-#${rootId} .aeo-choice.has-media{grid-template-columns:104px minmax(0,1fr)}
-#${rootId} .aeo-choice-media{background:#eef3f9;border:1px solid #d9e4f1;border-radius:8px;display:block;height:76px;overflow:hidden;width:104px}
-#${rootId} .aeo-choice-media img{width:100%;height:100%;display:block;object-fit:cover}
+#${rootId} .aeo-choice.has-media{align-content:start;grid-template-columns:1fr;gap:0;min-height:260px;overflow:hidden;padding:0}
+#${rootId} .aeo-choice-media{background:#eef3f9;display:block;min-height:168px;overflow:hidden;width:100%}
+#${rootId} .aeo-choice-media img{width:100%;height:100%;min-height:168px;display:block;object-fit:cover}
+#${rootId} .aeo-choice.has-media .aeo-choice-copy{background:var(--aeo-primary);color:#fff;gap:5px;min-height:78px;padding:14px;text-align:center}
+#${rootId} .aeo-choice.has-media .aeo-choice-label{color:#fff;font-size:17px}
+#${rootId} .aeo-choice.has-media .aeo-choice-hint{color:rgba(255,255,255,.82)}
 #${rootId} .aeo-choice-icon{align-items:center;background:color-mix(in srgb,var(--aeo-accent) 10%,white);border:1px solid color-mix(in srgb,var(--aeo-accent) 22%,white);border-radius:8px;color:var(--aeo-accent);display:flex;height:48px;justify-content:center;width:48px}
 #${rootId} .aeo-choice-icon svg{display:block;height:24px;width:24px}
 #${rootId} .aeo-choice-copy{display:grid;gap:3px;min-width:0}
@@ -337,7 +340,7 @@ function funnelCss(rootId: string, primary: string, accent: string, embedded: bo
 #${rootId} input:focus{outline:3px solid color-mix(in srgb,var(--aeo-accent) 20%,transparent);border-color:var(--aeo-accent)}
 #${rootId} .aeo-hp{position:absolute;left:-10000px}
 .aeo-legal{display:flex;justify-content:center;gap:16px;padding:8px 0 24px;font:13px system-ui}.aeo-legal a{color:#5a6475}
-@media(max-width:640px){#${rootId}{padding:14px}#${rootId} .aeo-choice-grid{grid-template-columns:1fr}#${rootId} .aeo-funnel-panel{padding:4px 0}#${rootId} .aeo-choice.has-media{grid-template-columns:84px minmax(0,1fr)}#${rootId} .aeo-choice-media{height:66px;width:84px}}
+@media(max-width:640px){#${rootId}{padding:14px}#${rootId} .aeo-choice-grid{grid-template-columns:1fr}#${rootId} .aeo-funnel-panel{padding:4px 0}#${rootId} .aeo-choice.has-media{min-height:220px}#${rootId} .aeo-choice-media,#${rootId} .aeo-choice-media img{min-height:142px}}
 </style>`;
 }
 
