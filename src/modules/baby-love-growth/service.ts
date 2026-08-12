@@ -29,7 +29,13 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
   const existing = await prisma.babyLoveGrowthImport.findUnique({
     where: { blogId_externalArticleId: { blogId, externalArticleId } },
   });
-  if (existing) return existing;
+  if (existing?.articleId) {
+    const articleStillExists = await prisma.article.findUnique({
+      where: { id: existing.articleId },
+      select: { id: true },
+    });
+    if (articleStillExists) return existing;
+  }
 
   const article = await createArticle(blogId, {
     title: payload.title || "Untitled BabyLoveGrowth Article",
@@ -44,11 +50,17 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
     noindex: false,
   });
 
-  return prisma.babyLoveGrowthImport.create({
-    data: {
+  return prisma.babyLoveGrowthImport.upsert({
+    where: { blogId_externalArticleId: { blogId, externalArticleId } },
+    create: {
       blogId,
       externalArticleId,
       status: "IMPORTED",
+      articleId: article!.id,
+      rawPayloadJson: payload as Prisma.InputJsonValue,
+    },
+    update: {
+      status: existing ? "REIMPORTED_AFTER_DELETE" : "IMPORTED",
       articleId: article!.id,
       rawPayloadJson: payload as Prisma.InputJsonValue,
     },
