@@ -105,7 +105,8 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
     const mediaMap = publicAssetMap(blog, await copyMediaAssetsToBuild(blog, referencedMediaIds, outputPath));
     const remoteImageSources = collectRemoteImageSources({ articles, funnels }).filter((source) => !mediaMap[source]);
     const imageSourceMap = publicAssetMap(blog, await copyRemoteImagesToBuild(remoteImageSources, outputPath, blog));
-    await writeFile(path.join(outputPath, "index.html"), renderIndexPage(blog, articles, renderOptions, mediaMap), "utf8");
+    const cardMediaMap = { ...imageSourceMap, ...mediaMap };
+    await writeFile(path.join(outputPath, "index.html"), renderIndexPage(blog, articles, renderOptions, cardMediaMap), "utf8");
     await writeFile(path.join(outputPath, "robots.txt"), renderRobots(blog), "utf8");
     await writeFile(path.join(outputPath, "rss.xml"), renderRss(blog, articles, renderOptions), "utf8");
     await writeFile(path.join(outputPath, "sitemap.xml"), renderSitemap(blog, articles, funnels, renderOptions), "utf8");
@@ -130,7 +131,7 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
           tag,
           articles.filter((article) => article.tags.some((entry) => entry.tag.slug === tag.slug)),
           renderOptions,
-          mediaMap
+          cardMediaMap
         ),
         "utf8"
       );
@@ -258,10 +259,10 @@ async function renderArticlePage(
       ${
         related.length
           ? `<section class="related"><h2>Related Articles</h2><div class="cards">${related
-              .map((item) => articleCard(blog, item, options))
+              .map((item) => articleCard(blog, item, options, { ...imageSourceMap, ...mediaMap }))
               .join("")}</div></section>`
           : ""
-      }
+        }
       <script type="application/ld+json">${jsonScript(schema)}</script>
       <script type="application/ld+json">${jsonScript(breadcrumb)}</script>
     `,
@@ -289,7 +290,15 @@ function firstMarkdownImageSource(markdown: string) {
   return match?.[1] || null;
 }
 
+function firstMarkdownImageSourceAnywhere(markdown: string) {
+  const markdownMatch = markdown.match(/!\[[^\]]*]\(\s*<?([^)\s>]+)>?(?:\s+["'][^"']*["'])?\s*\)/);
+  if (markdownMatch?.[1]) return markdownMatch[1];
+  const htmlMatch = markdown.match(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/i);
+  return htmlMatch?.[1] || null;
+}
+
 function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
+  const cards = articles.map((article) => articleCard(blog, article, options, mediaMap)).join("");
   return pageShell({
     blog,
     mediaMap,
@@ -302,9 +311,15 @@ function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: Rende
           <p class="eyebrow">Latest from ${escapeHtml(blog.brandName)}</p>
           <h1>${escapeHtml(blog.brandName)} Articles</h1>
           <p>Articles, guides, and resources from ${escapeHtml(blog.brandName)}.</p>
+          <label class="article-search" for="article-search-input">
+            <span>Search articles</span>
+            <input id="article-search-input" type="search" placeholder="Search by article title..." autocomplete="off" />
+          </label>
         </div>
       </section>
-      <section class="cards">${articles.map((article) => articleCard(blog, article, options)).join("") || "<p>No published articles yet.</p>"}</section>
+      <section class="cards" data-article-list>${cards || "<p>No published articles yet.</p>"}</section>
+      <p class="article-search-empty" data-search-empty hidden>No articles match your search.</p>
+      ${articles.length ? articleSearchScript() : ""}
     `,
   });
 }
@@ -323,7 +338,7 @@ function renderTagPage(blog: Blog, tag: Tag, articles: ArticleWithTags[], option
           <h1>${escapeHtml(tag.name)}</h1>
         </div>
       </section>
-      <section class="cards">${articles.map((article) => articleCard(blog, article, options)).join("")}</section>
+      <section class="cards">${articles.map((article) => articleCard(blog, article, options, mediaMap)).join("")}</section>
     `,
   });
 }
@@ -408,14 +423,24 @@ a:hover{text-decoration:underline}
 nav{display:flex;gap:16px;font-size:14px}
 main{max-width:1060px;margin:0 auto;padding:30px 16px 56px}
 .index-head{display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--line);padding:18px 0 24px;margin-bottom:22px}
+.article-search{display:grid;gap:7px;margin-top:18px;max-width:780px}
+.article-search span{color:var(--muted);font-size:13px;font-weight:900}
+.article-search input{appearance:none;background:#fff;border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;font-size:17px;min-height:52px;padding:12px 14px;width:100%;box-shadow:0 10px 24px rgba(23,32,51,.05)}
+.article-search input:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 16%,transparent);outline:none}
+.article-search-empty{background:#fff;border:1px solid var(--line);border-radius:8px;margin:0;padding:18px;text-align:center}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);font-weight:900;margin:0 0 8px}
 h1{font-size:clamp(34px,6vw,66px);line-height:1.02;margin:0 0 14px;letter-spacing:0}
 h2{font-size:26px;line-height:1.15;margin:30px 0 10px;letter-spacing:0}
 p{font-size:18px;line-height:1.65;color:var(--muted)}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px;box-shadow:0 12px 30px rgba(23,32,51,.06)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px rgba(23,32,51,.06)}
+.card-body{padding:16px}
+.card-image{aspect-ratio:16/9;background:#e9eff7;display:block;overflow:hidden}
+.card-image img{display:block;height:100%;object-fit:cover;width:100%}
 .card h2{font-size:20px;margin:0 0 8px}
 .card p{font-size:15px;line-height:1.45;margin:0 0 12px}
+.card-meta{align-items:center;color:var(--muted);display:flex;flex-wrap:wrap;font-size:13px;font-weight:850;gap:7px;margin:0 0 9px}
+.card-meta span+span:before{content:"";display:inline-block;width:4px;height:4px;border-radius:999px;background:#b3bfce;margin:0 7px 2px 0}
 .tagline{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .tag{border:1px solid color-mix(in srgb,var(--accent) 25%,white);color:var(--accent);border-radius:999px;font-size:12px;font-weight:800;padding:5px 8px}
 .article{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:clamp(18px,4vw,46px);box-shadow:0 12px 34px rgba(23,32,51,.07)}
@@ -431,16 +456,56 @@ p{font-size:18px;line-height:1.65;color:var(--muted)}
 .content-body th,.content-body td{border:1px solid var(--line);padding:10px;text-align:left}
 .related{margin-top:28px}
 .site-footer{border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:14px;padding:22px clamp(16px,4vw,42px);color:var(--muted);font-size:13px}
-@media(max-width:820px){.cards{grid-template-columns:1fr}.site-header,.site-footer{align-items:flex-start;flex-direction:column}.index-head{display:block}}
+@media(max-width:820px){.cards{grid-template-columns:1fr}.site-header,.site-footer{align-items:flex-start;flex-direction:column}.index-head{display:block}.article-search input{font-size:16px}}
 </style>`;
 }
 
-function articleCard(blog: Blog, article: ArticleWithTags, options: RenderOptions) {
-  return `<article class="card">
-    <h2><a href="${escapeAttribute(articlePath(blog, article, options))}">${escapeHtml(article.title)}</a></h2>
-    <p>${escapeHtml(article.excerpt || article.metaDescription || stripHtml(article.markdown).slice(0, 150))}</p>
-    <div class="tagline">${article.tags.map((entry) => `<a class="tag" href="${escapeAttribute(tagPath(blog, entry.tag, options))}">${escapeHtml(entry.tag.name)}</a>`).join("")}</div>
+function articleCard(blog: Blog, article: ArticleWithTags, options: RenderOptions, mediaMap: BuildMediaMap = {}) {
+  const imageUrl = articleCardImageUrl(article, mediaMap);
+  const publishedAt = article.publishedAt || article.createdAt;
+  return `<article class="card" data-article-card data-title="${escapeAttribute(article.title.toLocaleLowerCase())}">
+    ${imageUrl ? `<a class="card-image" href="${escapeAttribute(articlePath(blog, article, options))}"><img src="${escapeAttribute(imageUrl)}" alt="${escapeAttribute(article.heroAlt || article.title)}" loading="lazy" /></a>` : ""}
+    <div class="card-body">
+      <div class="card-meta"><span>${escapeHtml(article.authorName || blog.defaultAuthorName)}</span><span>${escapeHtml(formatDate(publishedAt))}</span></div>
+      <h2><a href="${escapeAttribute(articlePath(blog, article, options))}">${escapeHtml(article.title)}</a></h2>
+      <p>${escapeHtml(article.excerpt || article.metaDescription || stripHtml(article.markdown).slice(0, 150))}</p>
+      <div class="tagline">${article.tags.map((entry) => `<a class="tag" href="${escapeAttribute(tagPath(blog, entry.tag, options))}">${escapeHtml(entry.tag.name)}</a>`).join("")}</div>
+    </div>
   </article>`;
+}
+
+function articleCardImageUrl(article: ArticleWithTags, mediaMap: BuildMediaMap) {
+  if (article.heroMediaId && mediaMap[article.heroMediaId]) return mediaMap[article.heroMediaId];
+  const source = firstMarkdownImageSourceAnywhere(article.markdown);
+  if (!source) return null;
+  if (mediaMap[source]) return mediaMap[source];
+  const mediaId = source.match(/^media:(.+)$/)?.[1];
+  if (mediaId && mediaMap[mediaId]) return mediaMap[mediaId];
+  if (/^https?:\/\//i.test(source)) return source;
+  return null;
+}
+
+function articleSearchScript() {
+  return `<script>
+(() => {
+  const input = document.getElementById("article-search-input");
+  const cards = Array.from(document.querySelectorAll("[data-article-card]"));
+  const empty = document.querySelector("[data-search-empty]");
+  if (!input || cards.length === 0) return;
+  const filter = () => {
+    const query = input.value.trim().toLowerCase();
+    let visible = 0;
+    cards.forEach((card) => {
+      const title = String(card.getAttribute("data-title") || "");
+      const match = !query || title.includes(query);
+      card.hidden = !match;
+      if (match) visible += 1;
+    });
+    if (empty) empty.hidden = visible !== 0;
+  };
+  input.addEventListener("input", filter);
+})();
+</script>`;
 }
 
 function matchingFunnelEmbed(
