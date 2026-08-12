@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Save, SplitSquareVertical } from "lucide-react";
+import { Plus, Save, SplitSquareVertical, Trash2 } from "lucide-react";
 import { defaultFunnelConfig } from "@/modules/forms/default-funnel";
 
 type BlogOption = { id: string; name: string };
@@ -126,6 +126,21 @@ export function FunnelManager({
     setMessage("Placement rule added.");
   }
 
+  async function removeFunnel(funnel: FunnelRow) {
+    const confirmed = window.confirm(`Remove funnel "${funnel.name}"? Existing leads stay saved, but placement rules for this funnel will be removed.`);
+    if (!confirmed) return;
+    const response = await fetch(`/api/funnels/${funnel.id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.error || "Funnel remove failed.");
+      return;
+    }
+    await refresh("");
+    setSelectedId("");
+    setForm(funnelToForm(undefined, blogs[0]?.id || ""));
+    setMessage("Funnel removed.");
+  }
+
   return (
     <div className="funnel-workspace">
       <aside className="panel panel-pad funnel-rail">
@@ -170,6 +185,27 @@ export function FunnelManager({
                   <span>{funnel.blog?.name || "Selected blog"}</span>
                   <span>{funnel._count?.leads || 0} leads</span>
                   <span>{ruleCount} rules</span>
+                </div>
+                <div className="list-item-actions">
+                  <span className="muted">/{funnel.slug}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="mini-danger-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void removeFunnel(funnel);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void removeFunnel(funnel);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    Remove
+                  </span>
                 </div>
               </button>
             );

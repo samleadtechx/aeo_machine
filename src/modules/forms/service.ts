@@ -68,6 +68,11 @@ export async function updateFunnel(id: string, input: Partial<FunnelInput>) {
   });
 }
 
+export async function deleteFunnel(id: string) {
+  await prisma.funnel.delete({ where: { id } });
+  return { ok: true };
+}
+
 export async function upsertPlacementRule(funnelId: string, input: unknown) {
   const funnel = await prisma.funnel.findUniqueOrThrow({ where: { id: funnelId } });
   if (!funnel.blogId) throw new Error("Placement rules require a blog-scoped funnel.");

@@ -19,6 +19,7 @@ import {
   RefreshCcw,
   Save,
   Send,
+  Trash2,
   Type,
   Undo2,
   Upload,
@@ -250,6 +251,28 @@ export function ArticleWorkspace({
         return;
       }
       notify("success", success);
+    });
+  }
+
+  async function removeArticle(article: ArticleRow) {
+    const published = article.status === "PUBLISHED";
+    const confirmed = window.confirm(
+      `Remove "${article.title || "Untitled article"}"?${published ? " It is published now, so redeploy the blog after removing it to clear the public file from FTP." : ""}`
+    );
+    if (!confirmed) return;
+    await runBusy(`delete-${article.id}`, async () => {
+      const response = await fetch(`/api/articles/${article.id}`, { method: "DELETE" });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        notify("error", data.error || "Article remove failed.");
+        return;
+      }
+      const nextArticles = await refresh("");
+      setArticles(nextArticles.filter((item) => item.id !== article.id));
+      setSelectedId("");
+      setEditorOpen(false);
+      setForm(articleToForm(undefined, blogs[0]?.id || ""));
+      notify("success", published ? "Article removed. Redeploy the blog to remove it from FTP." : "Article removed.");
     });
   }
 
@@ -533,6 +556,27 @@ export function ArticleWorkspace({
                   <span>{article.source}</span>
                 </div>
                 <div className="article-list-url">{article.slug ? `/${article.slug}` : "No slug yet"}</div>
+                <div className="list-item-actions">
+                  <span className="muted">{new Date(article.updatedAt || article.createdAt || Date.now()).toLocaleDateString()}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="mini-danger-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void removeArticle(article);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void removeArticle(article);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    Remove
+                  </span>
+                </div>
               </button>
             );
           })}

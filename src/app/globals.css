@@ -354,6 +354,36 @@ select {
   font-weight: 750;
 }
 
+.list-item-actions {
+  align-items: center;
+  border-top: 1px solid #edf1f7;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.mini-danger-action {
+  align-items: center;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  color: var(--red);
+  display: inline-flex;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 8px;
+}
+
+.mini-danger-action:hover,
+.mini-danger-action:focus-visible {
+  background: #fff1f2;
+  outline: none;
+}
+
 .blog-list-footer,
 .lead-list-footer {
   display: flex;

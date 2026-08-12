@@ -138,6 +138,11 @@ export async function unpublishArticle(id: string) {
   });
 }
 
+export async function deleteArticle(id: string) {
+  await prisma.article.delete({ where: { id } });
+  return { ok: true };
+}
+
 export async function runAndPersistSeoAudit(id: string) {
   const article = await prisma.article.findUniqueOrThrow({
     where: { id },
