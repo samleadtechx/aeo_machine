@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { McpTokenManager } from "@/components/admin/McpTokenManager";
+import { appUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { listBlogs } from "@/modules/blogs/service";
 
@@ -32,6 +33,7 @@ export default async function McpPage() {
       <McpTokenManager
         initialTokens={JSON.parse(JSON.stringify(tokens))}
         initialBlogs={JSON.parse(JSON.stringify(blogs))}
+        endpointUrl={`${appUrl().replace(/\/+$/, "")}/api/mcp`}
       />
     </AdminShell>
   );
