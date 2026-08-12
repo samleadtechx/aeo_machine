@@ -519,31 +519,48 @@ function matchingFunnelEmbed(
   options: RenderOptions
 ) {
   const articleTagSlugs = article.tags.map((entry) => entry.tag.slug);
+  const matches: Array<{ funnel: FunnelWithRules; rule: FunnelPlacementRule }> = [];
   for (const funnel of funnels) {
-    const rule = funnel.placementRules.find((candidate) => {
-      if (candidate.blogId !== blog.id || !candidate.enabled) return false;
-      const required = Array.isArray(candidate.tagSlugsJson) ? candidate.tagSlugsJson.map(String) : [];
-      if (required.length === 0) return true;
-      return candidate.matchMode === "ALL_TAGS"
-        ? required.every((slug) => articleTagSlugs.includes(slug))
-        : required.some((slug) => articleTagSlugs.includes(slug));
-    });
-    if (rule) {
-      return {
-        placement: rule.placement,
-        html: renderFunnelHtml({
-          funnel,
-          endpoint,
-          webhookSecret,
-          mediaMap: { ...imageSourceMap, ...mediaMap },
-          embedded: true,
-          publicBasePath: publicPath(blog),
-          directPhpEndpoints: !options.htaccessEnabled,
-        }),
-      };
+    for (const rule of funnel.placementRules) {
+      if (placementRuleMatches(rule, blog.id, articleTagSlugs)) {
+        matches.push({ funnel, rule });
+      }
     }
   }
+
+  const winner = matches.sort((a, b) => {
+    const priority = a.rule.priority - b.rule.priority;
+    if (priority !== 0) return priority;
+    return b.rule.createdAt.getTime() - a.rule.createdAt.getTime();
+  })[0];
+
+  if (winner) {
+    return {
+      placement: winner.rule.placement,
+      html: renderFunnelHtml({
+        funnel: winner.funnel,
+        endpoint,
+        webhookSecret,
+        mediaMap: { ...imageSourceMap, ...mediaMap },
+        embedded: true,
+        publicBasePath: publicPath(blog),
+        directPhpEndpoints: !options.htaccessEnabled,
+      }),
+    };
+  }
   return null;
+}
+
+function placementRuleMatches(rule: FunnelPlacementRule, blogId: string, articleTagSlugs: string[]) {
+  if (rule.blogId !== blogId || !rule.enabled) return false;
+  const required = Array.isArray(rule.tagSlugsJson)
+    ? rule.tagSlugsJson.map((slug) => String(slug).trim().toLowerCase()).filter(Boolean)
+    : [];
+  if (required.length === 0) return true;
+  const articleTags = articleTagSlugs.map((slug) => slug.toLowerCase());
+  return rule.matchMode === "ALL_TAGS"
+    ? required.every((slug) => articleTags.includes(slug))
+    : required.some((slug) => articleTags.includes(slug));
 }
 
 function injectFunnel(html: string, embed: string, placement: string) {

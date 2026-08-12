@@ -18,6 +18,7 @@ type FunnelRow = {
     id: string;
     name: string;
     placement: string;
+    matchMode: string;
     tagSlugsJson: unknown;
     enabled: boolean;
     priority: number;
@@ -109,11 +110,13 @@ export function FunnelManager({
   async function addRule() {
     if (!form.id) return;
     setMessage("");
+    const priority = Number(rule.priority);
     const response = await fetch(`/api/funnels/${form.id}/placement-rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...rule,
+        priority: Number.isFinite(priority) ? priority : 100,
         tagSlugs: rule.tagSlugs.split(",").map((tag) => tag.trim()).filter(Boolean),
       }),
     });
@@ -269,6 +272,7 @@ export function FunnelManager({
                 <tr>
                   <th>Name</th>
                   <th>Tags</th>
+                  <th>Mode</th>
                   <th>Placement</th>
                   <th>Priority</th>
                 </tr>
@@ -278,6 +282,7 @@ export function FunnelManager({
                   <tr key={item.id}>
                     <td>{item.name}</td>
                     <td>{Array.isArray(item.tagSlugsJson) ? item.tagSlugsJson.join(", ") : "Any"}</td>
+                    <td>{item.matchMode === "ALL_TAGS" ? "All tags" : "Any tag"}</td>
                     <td>{item.placement}</td>
                     <td>{item.priority}</td>
                   </tr>
@@ -287,7 +292,10 @@ export function FunnelManager({
           ) : (
             <p className="muted">No placement rules yet.</p>
           )}
-          <div className="grid-3">
+          <div className="notice compact-notice">
+            Published articles show one embedded funnel. Active rules from all funnels are compared together; matching rules with lower priority numbers win. Rebuild or redeploy the blog after changing funnel rules.
+          </div>
+          <div className="grid-4">
             <label className="field">
               <span>Rule name</span>
               <input className="input" value={rule.name} onChange={(event) => setRule({ ...rule, name: event.target.value })} />
@@ -297,6 +305,13 @@ export function FunnelManager({
               <input className="input" value={rule.tagSlugs} onChange={(event) => setRule({ ...rule, tagSlugs: event.target.value })} />
             </label>
             <label className="field">
+              <span>Match mode</span>
+              <select className="select" value={rule.matchMode} onChange={(event) => setRule({ ...rule, matchMode: event.target.value })}>
+                <option value="ANY_TAG">Any tag</option>
+                <option value="ALL_TAGS">All tags</option>
+              </select>
+            </label>
+            <label className="field">
               <span>Placement</span>
               <select className="select" value={rule.placement} onChange={(event) => setRule({ ...rule, placement: event.target.value })}>
                 <option value="AFTER_INTRO">After intro</option>
@@ -304,6 +319,17 @@ export function FunnelManager({
                 <option value="BEFORE_CONCLUSION">Before conclusion</option>
                 <option value="END">End</option>
               </select>
+            </label>
+            <label className="field">
+              <span>Priority</span>
+              <input
+                className="input"
+                min={0}
+                step={1}
+                type="number"
+                value={rule.priority}
+                onChange={(event) => setRule({ ...rule, priority: Number(event.target.value) })}
+              />
             </label>
           </div>
           <button className="btn" type="button" disabled={!form.id} onClick={addRule}>
