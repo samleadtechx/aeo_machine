@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Hammer, RefreshCcw, Rocket, TestTube2 } from "lucide-react";
+import { Hammer, Loader2, RefreshCcw, Rocket, TestTube2 } from "lucide-react";
+import { OperationProgress, useOperationProgress } from "@/components/admin/OperationProgress";
 
 type BlogRow = { id: string; name: string; baseUrl: string };
 type BuildRow = {
@@ -40,7 +41,9 @@ export function DeploymentPanel({
   const [builds, setBuilds] = useState(initialBuilds);
   const [deployments, setDeployments] = useState(initialDeployments);
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingKey, setLoadingKey] = useState("");
+  const loading = Boolean(loadingKey);
+  const { progress, driftProgress, completeProgress, failProgress } = useOperationProgress();
 
   async function refresh(id = blogId) {
     if (!id) return;
@@ -55,9 +58,27 @@ export function DeploymentPanel({
     await refresh(id);
   }
 
-  async function post(path: string, success: string, body: Record<string, unknown> = {}) {
-    setLoading(true);
+  async function post(
+    key: string,
+    path: string,
+    success: string,
+    body: Record<string, unknown> = {},
+    progressOptions: {
+      label: string;
+      detail?: string;
+      start?: number;
+      ceiling?: number;
+      completeLabel?: string;
+    }
+  ) {
+    setLoadingKey(key);
     setMessage("");
+    driftProgress({
+      label: progressOptions.label,
+      detail: progressOptions.detail,
+      start: progressOptions.start || 12,
+      ceiling: progressOptions.ceiling || 88,
+    });
     try {
       const response = await fetch(path, {
         method: "POST",
@@ -66,11 +87,21 @@ export function DeploymentPanel({
       });
       const data = await response.json().catch(() => ({}));
       await refresh();
-      setMessage(response.ok ? `${success}${deploymentSummary(data.deployment)}` : data.error || "Action failed.");
+      if (!response.ok) {
+        const error = data.error || "Action failed.";
+        setMessage(error);
+        failProgress(`${progressOptions.label} failed`, error);
+        return;
+      }
+      const summary = deploymentSummary(data.deployment);
+      setMessage(`${success}${summary}`);
+      completeProgress(progressOptions.completeLabel || success, summary.trim() || undefined);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Action failed.");
+      const errorMessage = error instanceof Error ? error.message : "Action failed.";
+      setMessage(errorMessage);
+      failProgress(`${progressOptions.label} failed`, errorMessage);
     } finally {
-      setLoading(false);
+      setLoadingKey("");
     }
   }
 
@@ -80,7 +111,19 @@ export function DeploymentPanel({
       `Clean redeploy will delete every file in the saved FTP/SFTP remote folder${blog ? ` for ${blog.name}` : ""}, rebuild the blog, and upload it from scratch. Continue?`
     );
     if (!confirmed) return;
-    void post(`/api/blogs/${blogId}/deploy`, "Clean redeploy completed.", { rebuild: true, cleanRemoteRoot: true });
+    void post(
+      "clean-redeploy",
+      `/api/blogs/${blogId}/deploy`,
+      "Clean redeploy completed.",
+      { rebuild: true, cleanRemoteRoot: true },
+      {
+        label: "Clean redeploy running",
+        detail: "Rebuilding the blog, deleting files in the remote folder, then uploading fresh files.",
+        start: 10,
+        ceiling: 94,
+        completeLabel: "Clean redeploy completed",
+      }
+    );
   }
 
   return (
@@ -98,23 +141,65 @@ export function DeploymentPanel({
             </select>
           </label>
           <div className="button-row">
-            <button className="btn" type="button" disabled={!blogId || loading} onClick={() => post(`/api/blogs/${blogId}/test-deployment`, "Connection test passed.")}>
-              <TestTube2 size={16} />
+            <button
+              className="btn"
+              type="button"
+              disabled={!blogId || loading}
+              onClick={() => {
+                void post("test", `/api/blogs/${blogId}/test-deployment`, "Connection test passed.", {}, {
+                  label: "Testing connection",
+                  detail: "Connecting to the saved FTP/SFTP target.",
+                  start: 18,
+                  ceiling: 86,
+                  completeLabel: "Connection test passed",
+                });
+              }}
+            >
+              {loadingKey === "test" ? <Loader2 className="spin" size={16} /> : <TestTube2 size={16} />}
               Test
             </button>
-            <button className="btn primary" type="button" disabled={!blogId || loading} onClick={() => post(`/api/blogs/${blogId}/build`, "Build completed.")}>
-              <Hammer size={16} />
+            <button
+              className="btn primary"
+              type="button"
+              disabled={!blogId || loading}
+              onClick={() =>
+                post("build", `/api/blogs/${blogId}/build`, "Build completed.", {}, {
+                  label: "Building static files",
+                  detail: "Rendering article pages, funnels, assets, sitemap, RSS, and rewrite files.",
+                  start: 14,
+                  ceiling: 90,
+                  completeLabel: "Build completed",
+                })
+              }
+            >
+              {loadingKey === "build" ? <Loader2 className="spin" size={16} /> : <Hammer size={16} />}
               Build Now
             </button>
-            <button className="btn green" type="button" disabled={!blogId || loading} onClick={() => post(`/api/blogs/${blogId}/deploy`, "Deployment completed.")}>
-              <Rocket size={16} />
+            <button
+              className="btn green"
+              type="button"
+              disabled={!blogId || loading}
+              onClick={() =>
+                post("deploy", `/api/blogs/${blogId}/deploy`, "Deployment completed.", {}, {
+                  label: "Deploying latest build",
+                  detail: "Uploading static files and assets to the saved FTP/SFTP target.",
+                  start: 12,
+                  ceiling: 92,
+                  completeLabel: "Deployment completed",
+                })
+              }
+            >
+              {loadingKey === "deploy" ? <Loader2 className="spin" size={16} /> : <Rocket size={16} />}
               Deploy Latest
             </button>
             <button className="btn danger" type="button" disabled={!blogId || loading} onClick={cleanRedeploy}>
-              <RefreshCcw size={16} />
+              {loadingKey === "clean-redeploy" ? <Loader2 className="spin" size={16} /> : <RefreshCcw size={16} />}
               Clean Redeploy
             </button>
           </div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <OperationProgress progress={progress} />
         </div>
         {message ? <div className="notice" style={{ marginTop: 12 }}>{message}</div> : null}
       </section>

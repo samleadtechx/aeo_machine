@@ -730,6 +730,62 @@ select {
   color: #8b1a1a;
 }
 
+.operation-progress {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+}
+
+.operation-progress-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.operation-progress-head span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.operation-progress-track {
+  background: #e6edf5;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.operation-progress-track span {
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 0.35s ease;
+}
+
+.operation-progress-detail {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.operation-progress.success {
+  border-color: #b8e6c8;
+}
+
+.operation-progress.error {
+  border-color: #f3b8b8;
+}
+
+.operation-progress.error .operation-progress-track span {
+  background: var(--red);
+}
+
 .toast {
   position: fixed;
   right: 22px;

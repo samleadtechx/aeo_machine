@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { OperationProgress, useOperationProgress } from "@/components/admin/OperationProgress";
 import {
   AlertCircle,
   Bold,
@@ -113,6 +114,7 @@ export function ArticleWorkspace({
   const [media, setMedia] = useState<MediaRow[]>([]);
   const [editorFont, setEditorFont] = useState<keyof typeof editorFonts>("system");
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
+  const { progress, showProgress, driftProgress, completeProgress, failProgress } = useOperationProgress();
   const selected = useMemo(() => articles.find((article) => article.id === selectedId), [articles, selectedId]);
   const [form, setForm] = useState<ArticleForm>(() => articleToForm(undefined, blogs[0]?.id || ""));
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -281,12 +283,20 @@ export function ArticleWorkspace({
     await runBusy("publish", async () => {
       setMessage("");
       setPublishResult(null);
+      showProgress("Saving article", "Saving latest edits before publishing.", 12);
       notify("info", "Saving latest edits before publishing...");
       const saved = await persistDraft();
       if (!saved.ok) {
+        failProgress("Publish stopped", `Could not save before publishing: ${saved.error}`);
         notify("error", `Could not save before publishing: ${saved.error}`);
         return;
       }
+      driftProgress({
+        label: "Publishing and uploading",
+        detail: "Rendering static HTML, copying assets, and uploading files to FTP/SFTP.",
+        start: 34,
+        ceiling: 92,
+      });
       const response = await fetch(`/api/articles/${saved.articleId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -300,11 +310,16 @@ export function ArticleWorkspace({
           error: data.error || "Publish/upload failed.",
           stage: data.stage,
         });
+        failProgress(
+          data.stage === "deploy" ? "Upload failed" : "Publish failed",
+          data.error || "Publish/upload failed."
+        );
         notify("error", data.error || "Publish/upload failed.");
         return;
       }
       const uploadedFiles = Number(data.deployment?.uploadedFiles || 0);
       setPublishResult({ articleUrl: data.articleUrl, uploadedFiles });
+      completeProgress("Published and uploaded", `Uploaded ${uploadedFiles} files to the saved FTP/SFTP target.`);
       notify("success", `Article published and uploaded ${uploadedFiles} files.`);
     });
   }
@@ -625,6 +640,7 @@ export function ArticleWorkspace({
             ) : null}
           </div>
         </div>
+        <OperationProgress progress={progress} />
 
         <section className="panel article-compose-panel">
           <textarea
