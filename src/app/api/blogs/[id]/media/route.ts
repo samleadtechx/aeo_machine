@@ -26,6 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       mimeType: file.type,
       bytes: await fileBuffer(file),
       altText: typeof form.get("altText") === "string" ? String(form.get("altText")) : null,
+      role: form.get("role") === "logo" ? "logo" : "article",
     });
     return NextResponse.json({ media }, { status: 201 });
   } catch (error) {

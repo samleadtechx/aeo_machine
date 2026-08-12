@@ -57,6 +57,7 @@ export async function createMediaAsset(input: {
   mimeType: string;
   bytes: Buffer;
   altText?: string | null;
+  role?: ImageRole;
 }) {
   if (!allowedMimeTypes.has(input.mimeType)) {
     throw new Error("Unsupported image type.");
@@ -67,7 +68,7 @@ export async function createMediaAsset(input: {
     mimeType: input.mimeType,
     originalName: input.originalName,
     settings,
-    role: "article",
+    role: input.role || "article",
   });
   const hash = createHash("sha256").update(optimized.bytes).digest("hex");
   const extension = extensionFor(input.originalName, optimized.mimeType);
