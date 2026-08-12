@@ -1,10 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Save, SplitSquareVertical, Trash2 } from "lucide-react";
+import { Pencil, Plus, Save, SplitSquareVertical, Trash2, X } from "lucide-react";
 import { defaultFunnelConfig } from "@/modules/forms/default-funnel";
 
 type BlogOption = { id: string; name: string };
+type PlacementRuleRow = {
+  id: string;
+  name: string;
+  placement: string;
+  matchMode: string;
+  tagSlugsJson: unknown;
+  enabled: boolean;
+  priority: number;
+};
 type FunnelRow = {
   id: string;
   blogId: string;
@@ -14,16 +23,26 @@ type FunnelRow = {
   configJson: unknown;
   styleJson?: Record<string, unknown>;
   blog?: { name: string; slug: string };
-  placementRules?: Array<{
-    id: string;
-    name: string;
-    placement: string;
-    matchMode: string;
-    tagSlugsJson: unknown;
-    enabled: boolean;
-    priority: number;
-  }>;
+  placementRules?: PlacementRuleRow[];
   _count?: { leads: number };
+};
+
+type RuleForm = {
+  name: string;
+  enabled: boolean;
+  matchMode: string;
+  tagSlugs: string;
+  placement: string;
+  priority: number;
+};
+
+const emptyRuleForm: RuleForm = {
+  name: "Article quiz placement",
+  enabled: true,
+  matchMode: "ANY_TAG",
+  tagSlugs: "",
+  placement: "AFTER_INTRO",
+  priority: 10,
 };
 
 export function FunnelManager({
@@ -39,14 +58,8 @@ export function FunnelManager({
   const selected = useMemo(() => funnels.find((funnel) => funnel.id === selectedId), [funnels, selectedId]);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState(() => funnelToForm(selected, blogs[0]?.id || ""));
-  const [rule, setRule] = useState({
-    name: "Article quiz placement",
-    enabled: true,
-    matchMode: "ANY_TAG",
-    tagSlugs: "seo, aeo",
-    placement: "AFTER_INTRO",
-    priority: 10,
-  });
+  const [rule, setRule] = useState<RuleForm>(emptyRuleForm);
+  const [editingRuleId, setEditingRuleId] = useState("");
 
   async function refresh(selectId = selectedId) {
     const all: FunnelRow[] = [];
@@ -65,12 +78,14 @@ export function FunnelManager({
   function choose(funnel: FunnelRow) {
     setSelectedId(funnel.id);
     setForm(funnelToForm(funnel, funnel.blogId));
+    resetRuleForm();
     setMessage("");
   }
 
   function createNew() {
     setSelectedId("");
     setForm(funnelToForm(undefined, blogs[0]?.id || ""));
+    resetRuleForm();
     setMessage("");
   }
 
@@ -107,12 +122,12 @@ export function FunnelManager({
     setMessage("Funnel saved.");
   }
 
-  async function addRule() {
+  async function saveRule() {
     if (!form.id) return;
     setMessage("");
     const priority = Number(rule.priority);
-    const response = await fetch(`/api/funnels/${form.id}/placement-rules`, {
-      method: "POST",
+    const response = await fetch(editingRuleId ? `/api/funnels/${form.id}/placement-rules/${editingRuleId}` : `/api/funnels/${form.id}/placement-rules`, {
+      method: editingRuleId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...rule,
@@ -126,7 +141,43 @@ export function FunnelManager({
       return;
     }
     await refresh(form.id);
-    setMessage("Placement rule added.");
+    const wasEditing = Boolean(editingRuleId);
+    resetRuleForm();
+    setMessage(wasEditing ? "Placement rule updated." : "Placement rule added.");
+  }
+
+  function editRule(item: PlacementRuleRow) {
+    setEditingRuleId(item.id);
+    setRule({
+      name: item.name,
+      enabled: item.enabled,
+      matchMode: item.matchMode,
+      tagSlugs: Array.isArray(item.tagSlugsJson) ? item.tagSlugsJson.join(", ") : "",
+      placement: item.placement,
+      priority: item.priority,
+    });
+    setMessage("");
+  }
+
+  function resetRuleForm() {
+    setEditingRuleId("");
+    setRule(emptyRuleForm);
+  }
+
+  async function removeRule(item: PlacementRuleRow) {
+    if (!form.id) return;
+    const tags = Array.isArray(item.tagSlugsJson) && item.tagSlugsJson.length ? item.tagSlugsJson.join(", ") : "all articles";
+    const confirmed = window.confirm(`Remove placement rule "${item.name}" for ${tags}?`);
+    if (!confirmed) return;
+    const response = await fetch(`/api/funnels/${form.id}/placement-rules/${item.id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.error || "Rule remove failed.");
+      return;
+    }
+    await refresh(form.id);
+    resetRuleForm();
+    setMessage("Placement rule removed.");
   }
 
   async function removeFunnel(funnel: FunnelRow) {
@@ -275,16 +326,27 @@ export function FunnelManager({
                   <th>Mode</th>
                   <th>Placement</th>
                   <th>Priority</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {selected.placementRules.map((item) => (
                   <tr key={item.id}>
                     <td>{item.name}</td>
-                    <td>{Array.isArray(item.tagSlugsJson) ? item.tagSlugsJson.join(", ") : "Any"}</td>
+                    <td>{Array.isArray(item.tagSlugsJson) && item.tagSlugsJson.length ? item.tagSlugsJson.join(", ") : "Any article"}</td>
                     <td>{item.matchMode === "ALL_TAGS" ? "All tags" : "Any tag"}</td>
                     <td>{item.placement}</td>
                     <td>{item.priority}</td>
+                    <td>
+                      <div className="button-row">
+                        <button className="btn icon-btn" type="button" title="Edit rule" onClick={() => editRule(item)}>
+                          <Pencil size={15} />
+                        </button>
+                        <button className="btn icon-btn danger" type="button" title="Remove rule" onClick={() => void removeRule(item)}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -293,8 +355,17 @@ export function FunnelManager({
             <p className="muted">No placement rules yet.</p>
           )}
           <div className="notice compact-notice">
-            Published articles show one embedded funnel. Active rules from all funnels are compared together; matching rules with lower priority numbers win. Rebuild or redeploy the blog after changing funnel rules.
+            Published articles show one embedded funnel. Leave tag slugs blank to match every article, or use exact article tags like virtual-receptionist, cost. Active rules from all funnels are compared together; lower priority numbers win. Rebuild or redeploy the blog after changing rules.
           </div>
+          {editingRuleId ? (
+            <div className="button-row">
+              <span className="badge warn">Editing rule</span>
+              <button className="btn" type="button" onClick={resetRuleForm}>
+                <X size={16} />
+                Cancel
+              </button>
+            </div>
+          ) : null}
           <div className="grid-4">
             <label className="field">
               <span>Rule name</span>
@@ -302,7 +373,12 @@ export function FunnelManager({
             </label>
             <label className="field">
               <span>Tag slugs</span>
-              <input className="input" value={rule.tagSlugs} onChange={(event) => setRule({ ...rule, tagSlugs: event.target.value })} />
+              <input
+                className="input"
+                placeholder="Blank = all articles"
+                value={rule.tagSlugs}
+                onChange={(event) => setRule({ ...rule, tagSlugs: event.target.value })}
+              />
             </label>
             <label className="field">
               <span>Match mode</span>
@@ -332,9 +408,9 @@ export function FunnelManager({
               />
             </label>
           </div>
-          <button className="btn" type="button" disabled={!form.id} onClick={addRule}>
-            <Plus size={16} />
-            Add Rule
+          <button className="btn" type="button" disabled={!form.id} onClick={saveRule}>
+            {editingRuleId ? <Save size={16} /> : <Plus size={16} />}
+            {editingRuleId ? "Update Rule" : "Add Rule"}
           </button>
         </div>
       </section>

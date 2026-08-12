@@ -90,3 +90,43 @@ export async function upsertPlacementRule(funnelId: string, input: unknown) {
     },
   });
 }
+
+export async function updatePlacementRule(funnelId: string, ruleId: string, input: unknown) {
+  const existing = await prisma.funnelPlacementRule.findFirstOrThrow({
+    where: { id: ruleId, funnelId },
+  });
+  const data = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const parsed = placementRuleInputSchema.parse({
+    name: "name" in data ? data.name : existing.name,
+    enabled: "enabled" in data ? data.enabled : existing.enabled,
+    matchMode: "matchMode" in data ? data.matchMode : existing.matchMode,
+    tagSlugs:
+      "tagSlugs" in data
+        ? data.tagSlugs
+        : Array.isArray(existing.tagSlugsJson)
+          ? existing.tagSlugsJson.map(String)
+          : [],
+    placement: "placement" in data ? data.placement : existing.placement,
+    priority: "priority" in data ? data.priority : existing.priority,
+  });
+  return prisma.funnelPlacementRule.update({
+    where: { id: ruleId },
+    data: {
+      name: parsed.name,
+      enabled: parsed.enabled,
+      matchMode: parsed.matchMode,
+      tagSlugsJson: parsed.tagSlugs,
+      placement: parsed.placement,
+      priority: parsed.priority,
+    },
+  });
+}
+
+export async function deletePlacementRule(funnelId: string, ruleId: string) {
+  const existing = await prisma.funnelPlacementRule.findFirstOrThrow({
+    where: { id: ruleId, funnelId },
+    select: { id: true },
+  });
+  await prisma.funnelPlacementRule.delete({ where: { id: existing.id } });
+  return { ok: true };
+}
