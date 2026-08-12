@@ -199,7 +199,7 @@ async function renderArticlePage(
 ) {
   const canonical = articleCanonicalUrl(blog, article, options);
   const rewrittenMarkdown = await replaceMarkdownMediaReferences(blog.id, article.markdown, mediaMap, imageSourceMap);
-  const bodyHtml = await markdownToHtml(rewrittenMarkdown);
+  const bodyHtml = await markdownToHtml(stripLeadingMarkdownTitle(rewrittenMarkdown, article.title));
   const related = allArticles
     .filter((candidate) => candidate.id !== article.id)
     .filter((candidate) =>
@@ -295,6 +295,35 @@ function firstMarkdownImageSourceAnywhere(markdown: string) {
   if (markdownMatch?.[1]) return markdownMatch[1];
   const htmlMatch = markdown.match(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/i);
   return htmlMatch?.[1] || null;
+}
+
+function stripLeadingMarkdownTitle(markdown: string, title: string) {
+  const lines = markdown.replace(/^\uFEFF/, "").split(/\r?\n/);
+  const firstContentIndex = lines.findIndex((line) => line.trim() !== "");
+  if (firstContentIndex < 0) return markdown;
+
+  const heading = lines[firstContentIndex].match(/^#\s+(.+?)\s*#*\s*$/);
+  if (!heading || normalizeHeadingText(heading[1]) !== normalizeHeadingText(title)) return markdown;
+
+  lines.splice(firstContentIndex, 1);
+  while (lines[firstContentIndex]?.trim() === "") {
+    lines.splice(firstContentIndex, 1);
+  }
+  return lines.join("\n").trimStart();
+}
+
+function normalizeHeadingText(value: string) {
+  return value
+    .replace(/!\[([^\]]*)]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/[#>*_`~\\]/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
