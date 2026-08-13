@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin/AdminShell";
+import { BabyLoveGrowthSettingsManager } from "@/components/admin/BabyLoveGrowthSettingsManager";
 import { CopyValue } from "@/components/admin/CopyValue";
 import { ImageOptimizationManager } from "@/components/admin/ImageOptimizationManager";
 import { MediaManager } from "@/components/admin/MediaManager";
@@ -6,6 +7,7 @@ import { OutboundWebhookManager } from "@/components/admin/OutboundWebhookManage
 import { appUrl, publicWebhookBaseUrl, storageDir } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto/encryption";
+import { listBabyLoveGrowthSettings } from "@/modules/baby-love-growth/service";
 import { ensurePublicWebhookEndpoint, listBlogs } from "@/modules/blogs/service";
 import { listOutboundWebhooks } from "@/modules/leads/outbound";
 import { listMediaAssets } from "@/modules/media/service";
@@ -22,7 +24,7 @@ export default async function SettingsPage() {
     )
   );
 
-  const [user, endpoints, media, outboundWebhooks] = await Promise.all([
+  const [user, endpoints, media, outboundWebhooks, babyLoveGrowthSettings] = await Promise.all([
     prisma.user.findFirst(),
     prisma.publicWebhookEndpoint.findMany({
       include: { blog: { select: { name: true, slug: true } } },
@@ -30,10 +32,14 @@ export default async function SettingsPage() {
     }),
     listMediaAssets(),
     listOutboundWebhooks(),
+    listBabyLoveGrowthSettings(),
   ]);
   const baseUrl = appUrl().replace(/\/+$/, "");
   const webhookBaseUrl = publicWebhookBaseUrl();
   const publicWebhookLooksExternal = /^https:\/\//i.test(webhookBaseUrl) && !/localhost|127\.0\.0\.1/i.test(webhookBaseUrl);
+  const babyLoveGrowthSettingsByBlog = new Map(
+    babyLoveGrowthSettings.map((setting) => [setting.blogId, setting])
+  );
   const endpointCards = [...endpoints]
     .sort((a, b) => endpointPriority(a.type) - endpointPriority(b.type))
     .map((endpoint) => {
@@ -41,12 +47,16 @@ export default async function SettingsPage() {
     const secret = decryptSecret(endpoint.secretEncrypted) || "";
     const samplePayload = samplePayloadFor(endpoint.type);
     const isBabyLoveGrowth = endpoint.type === "BABYLOVEGROWTH";
+    const babyLoveGrowthAutoPublish = isBabyLoveGrowth
+      ? babyLoveGrowthSettingsByBlog.get(endpoint.blogId)?.autoPublish ?? false
+      : undefined;
     const copyAll = {
       blog: endpoint.blog.name,
       type: endpoint.type,
       method: "POST",
       url,
       publicId: endpoint.publicId,
+      ...(isBabyLoveGrowth ? { autoPublish: babyLoveGrowthAutoPublish } : {}),
       [isBabyLoveGrowth ? "bearerToken" : "secret"]: secret,
       headers: isBabyLoveGrowth
         ? {
@@ -118,6 +128,11 @@ export default async function SettingsPage() {
         initialWebhooks={JSON.parse(JSON.stringify(outboundWebhooks))}
       />
 
+      <BabyLoveGrowthSettingsManager
+        initialBlogs={blogs.map((blog) => ({ id: blog.id, name: blog.name, slug: blog.slug }))}
+        initialSettings={JSON.parse(JSON.stringify(babyLoveGrowthSettings))}
+      />
+
       <section className="panel panel-pad stack" style={{ marginTop: 16 }}>
         <div>
           <p className="eyebrow">Copy-ready integration details</p>
@@ -126,7 +141,8 @@ export default async function SettingsPage() {
         <div className="notice">
           BabyLoveGrowth imports use the BabyLoveGrowth endpoint below. In BabyLoveGrowth, open
           Settings &rarr; Publishing &rarr; Webhook, paste the endpoint URL, and use the bearer token
-          as the webhook secret/token. Imported articles are always created as drafts.
+          as the webhook secret/token. Imported articles are created as drafts unless auto-publish is enabled
+          for that blog above.
           {" "}
           <a href="https://www.babylovegrowth.ai/docs/integrations/webhook" target="_blank" rel="noreferrer">
             BabyLoveGrowth webhook docs

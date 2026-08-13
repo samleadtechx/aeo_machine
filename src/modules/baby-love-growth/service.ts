@@ -1,7 +1,9 @@
-import type { Prisma } from "@prisma/client";
+import type { BabyLoveGrowthImport, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ensureSlug } from "@/lib/utils/slugify";
-import { createArticle } from "@/modules/articles/service";
+import { createArticle, publishArticle } from "@/modules/articles/service";
+
+const SETTINGS_CREDENTIAL_NAME = "Webhook import settings";
 
 type BabyLoveGrowthPayload = {
   id?: string | number;
@@ -23,8 +25,94 @@ type BabyLoveGrowthPayload = {
   tags?: string[];
 };
 
+type BabyLoveGrowthSettingsJson = {
+  autoPublish: boolean;
+};
+
+export type BabyLoveGrowthBlogSetting = {
+  blogId: string;
+  blogName: string;
+  blogSlug: string;
+  autoPublish: boolean;
+  enabled: boolean;
+  updatedAt: Date | null;
+};
+
+export async function listBabyLoveGrowthSettings(): Promise<BabyLoveGrowthBlogSetting[]> {
+  const [blogs, credentials] = await Promise.all([
+    prisma.blog.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true, slug: true },
+    }),
+    prisma.integrationCredential.findMany({
+      where: { provider: "BABYLOVEGROWTH", name: SETTINGS_CREDENTIAL_NAME },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+  const credentialByBlog = new Map<string, (typeof credentials)[number]>();
+  for (const credential of credentials) {
+    if (credential.blogId && !credentialByBlog.has(credential.blogId)) {
+      credentialByBlog.set(credential.blogId, credential);
+    }
+  }
+
+  return blogs.map((blog) => {
+    const credential = credentialByBlog.get(blog.id);
+    const settings = parseBabyLoveGrowthSettings(credential?.settingsJson);
+    return {
+      blogId: blog.id,
+      blogName: blog.name,
+      blogSlug: blog.slug,
+      autoPublish: settings.autoPublish,
+      enabled: credential?.enabled ?? true,
+      updatedAt: credential?.updatedAt ?? null,
+    };
+  });
+}
+
+export async function setBabyLoveGrowthAutoPublish(blogId: string, autoPublish: boolean) {
+  const blog = await prisma.blog.findUnique({
+    where: { id: blogId },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!blog) throw new Error("Blog not found.");
+  const existing = await latestBabyLoveGrowthCredential(blogId);
+  const settings = {
+    ...parseBabyLoveGrowthSettings(existing?.settingsJson),
+    autoPublish,
+  };
+
+  const credential = existing
+    ? await prisma.integrationCredential.update({
+        where: { id: existing.id },
+        data: {
+          enabled: true,
+          settingsJson: settings as Prisma.InputJsonValue,
+        },
+      })
+    : await prisma.integrationCredential.create({
+        data: {
+          blogId,
+          provider: "BABYLOVEGROWTH",
+          name: SETTINGS_CREDENTIAL_NAME,
+          enabled: true,
+          settingsJson: settings as Prisma.InputJsonValue,
+        },
+      });
+
+  return {
+    blogId: blog.id,
+    blogName: blog.name,
+    blogSlug: blog.slug,
+    autoPublish: parseBabyLoveGrowthSettings(credential.settingsJson).autoPublish,
+    enabled: credential.enabled,
+    updatedAt: credential.updatedAt,
+  };
+}
+
 export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyLoveGrowthPayload) {
-  const externalArticleId = String(payload.id || payload.articleId || "");
+  const sourceId = payload.id ?? payload.articleId;
+  const externalArticleId = sourceId === undefined || sourceId === null ? "" : String(sourceId);
   if (!externalArticleId) throw new Error("BabyLoveGrowth article ID is required.");
   const existing = await prisma.babyLoveGrowthImport.findUnique({
     where: { blogId_externalArticleId: { blogId, externalArticleId } },
@@ -34,7 +122,7 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
       where: { id: existing.articleId },
       select: { id: true },
     });
-    if (articleStillExists) return existing;
+    if (articleStillExists) return maybeAutoPublishImport(existing);
   }
 
   const article = await createArticle(blogId, {
@@ -50,7 +138,7 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
     noindex: false,
   });
 
-  return prisma.babyLoveGrowthImport.upsert({
+  const imported = await prisma.babyLoveGrowthImport.upsert({
     where: { blogId_externalArticleId: { blogId, externalArticleId } },
     create: {
       blogId,
@@ -65,6 +153,7 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
       rawPayloadJson: payload as Prisma.InputJsonValue,
     },
   });
+  return maybeAutoPublishImport(imported);
 }
 
 export async function syncBabyLoveGrowth() {
@@ -75,4 +164,49 @@ export async function syncBabyLoveGrowth() {
     },
   });
   return { queued: true };
+}
+
+async function babyLoveGrowthAutoPublishEnabled(blogId: string) {
+  const credential = await latestBabyLoveGrowthCredential(blogId);
+  if (!credential?.enabled) return false;
+  return parseBabyLoveGrowthSettings(credential.settingsJson).autoPublish;
+}
+
+async function latestBabyLoveGrowthCredential(blogId: string) {
+  return prisma.integrationCredential.findFirst({
+    where: {
+      blogId,
+      provider: "BABYLOVEGROWTH",
+      name: SETTINGS_CREDENTIAL_NAME,
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+}
+
+async function maybeAutoPublishImport(imported: BabyLoveGrowthImport) {
+  if (!imported.articleId || !(await babyLoveGrowthAutoPublishEnabled(imported.blogId))) {
+    return imported;
+  }
+
+  try {
+    await publishArticle(imported.articleId);
+    return prisma.babyLoveGrowthImport.update({
+      where: { id: imported.id },
+      data: { status: "AUTO_PUBLISHED" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Auto-publish failed.";
+    return prisma.babyLoveGrowthImport.update({
+      where: { id: imported.id },
+      data: { status: `AUTO_PUBLISH_FAILED: ${message.slice(0, 240)}` },
+    });
+  }
+}
+
+function parseBabyLoveGrowthSettings(settingsJson: unknown): BabyLoveGrowthSettingsJson {
+  if (!settingsJson || typeof settingsJson !== "object" || Array.isArray(settingsJson)) {
+    return { autoPublish: false };
+  }
+  const settings = settingsJson as Record<string, unknown>;
+  return { autoPublish: settings.autoPublish === true };
 }

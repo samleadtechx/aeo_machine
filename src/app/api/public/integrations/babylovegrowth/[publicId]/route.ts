@@ -11,7 +11,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ pub
     const verification = await verifyBearerWebhook((await params).publicId, "BABYLOVEGROWTH", request.headers);
     const payload = JSON.parse(rawBody);
     const imported = await importBabyLoveGrowthArticle(verification.endpoint.blogId, payload);
-    return NextResponse.json({ ok: true, importId: imported.id });
+    return NextResponse.json({
+      ok: true,
+      importId: imported.id,
+      articleId: imported.articleId,
+      status: imported.status,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "BabyLoveGrowth webhook failed.";
     const status = /bearer|token|secret|not found/i.test(message) ? 401 : 400;
