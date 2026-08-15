@@ -1,7 +1,10 @@
 import type { BabyLoveGrowthImport, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { canonicalArticleUrl } from "@/lib/utils/url";
 import { ensureSlug } from "@/lib/utils/slugify";
 import { createArticle, publishArticle } from "@/modules/articles/service";
+import { deployBuild } from "@/modules/deployments/service";
+import { buildBlogStaticSite } from "@/modules/rendering/site-renderer";
 
 const SETTINGS_CREDENTIAL_NAME = "Webhook import settings";
 
@@ -207,16 +210,61 @@ async function maybeAutoPublishImport(imported: BabyLoveGrowthImport) {
 
   try {
     await publishArticle(imported.articleId);
-    return prisma.babyLoveGrowthImport.update({
-      where: { id: imported.id },
-      data: { status: "AUTO_PUBLISHED" },
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Auto-publish failed.";
     return prisma.babyLoveGrowthImport.update({
       where: { id: imported.id },
       data: { status: `AUTO_PUBLISH_FAILED: ${message.slice(0, 240)}` },
     });
+  }
+
+  try {
+    await buildAndDeployAutoPublishedArticle(imported.articleId);
+    return prisma.babyLoveGrowthImport.update({
+      where: { id: imported.id },
+      data: { status: "AUTO_PUBLISHED_AND_UPLOADED" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Auto-upload failed.";
+    return prisma.babyLoveGrowthImport.update({
+      where: { id: imported.id },
+      data: { status: `AUTO_UPLOAD_FAILED: ${message.slice(0, 240)}` },
+    });
+  }
+}
+
+async function buildAndDeployAutoPublishedArticle(articleId: string) {
+  const article = await prisma.article.findUniqueOrThrow({
+    where: { id: articleId },
+    include: { blog: { select: { baseUrl: true } } },
+  });
+  const target = await prisma.deploymentTarget.findFirst({
+    where: { blogId: article.blogId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!target) {
+    throw new Error("Article is published, but upload failed: no deployment target is saved for this blog.");
+  }
+  const articleUrl = canonicalArticleUrl(article.blog.baseUrl, article.slug, target.cleanUrlMode !== "HTML");
+  const mainPageUrl = article.blog.baseUrl;
+  let build;
+  try {
+    build = await buildBlogStaticSite(article.blogId, "ARTICLE_PUBLISH");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Static build failed.";
+    throw new Error(`Article is published, but static build failed: ${message}`);
+  }
+
+  try {
+    await deployBuild(build.id, {
+      publicVerifications: [
+        { url: articleUrl, expectedText: article.title },
+        { url: mainPageUrl, expectedText: article.title },
+      ],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "FTP/SFTP upload failed.";
+    throw new Error(`Article is published, but FTP/SFTP upload failed: ${message}`);
   }
 }
 

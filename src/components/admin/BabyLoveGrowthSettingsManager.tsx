@@ -64,7 +64,11 @@ export function BabyLoveGrowthSettingsManager({
         return [...rest, data.setting];
       });
       setMessage(
-        `${blog.name}: BabyLoveGrowth imports will ${data.setting.autoPublish ? "auto-publish after passing the publishing gate" : "stay as drafts"}.`
+        `${blog.name}: BabyLoveGrowth imports will ${
+          data.setting.autoPublish
+            ? "publish, rebuild the blog, and upload after passing the publishing gate"
+            : "stay as drafts"
+        }.`
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "BabyLoveGrowth setting could not be saved.");
@@ -159,9 +163,10 @@ export function BabyLoveGrowthSettingsManager({
       </div>
       <div className="notice compact-notice">
         Auto-publish runs the same publishing gate as the article editor. If SEO/AEO blockers fail, the
-        import stays as a draft and the BabyLoveGrowth import status records the failure. Default tags are
-        only used when BabyLoveGrowth does not send tags with the article. Default author is stored on the
-        blog and is applied to newly created articles.
+        import stays as a draft and the BabyLoveGrowth import status records the failure. When it passes,
+        the blog is rebuilt and uploaded to the saved FTP/SFTP target. Default tags are only used when
+        BabyLoveGrowth does not send tags with the article. Default author is stored on the blog and is
+        applied to newly created articles.
       </div>
       <div className="grid-2">
         {blogs.map((blog) => {
@@ -231,7 +236,7 @@ export function BabyLoveGrowthSettingsManager({
                   disabled={busy}
                   onChange={() => void toggle(blog)}
                 />
-                Publish BabyLoveGrowth imports automatically
+                Publish and upload BabyLoveGrowth imports automatically
               </label>
               <button
                 className={`btn ${autoPublish ? "danger" : "primary"}`}
