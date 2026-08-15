@@ -136,7 +136,15 @@ async function expectedTitleFromFile(filePath: string) {
 }
 
 async function verifyPublicPage({ url, expectedText }: PublicVerification) {
-  const response = await fetch(url, { redirect: "follow" });
+  const fetchUrl = verificationUrl(url);
+  const response = await fetch(fetchUrl, {
+    redirect: "follow",
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!response.ok) {
     throw new Error(
       `FTP upload completed, but public verification failed: ${url} returned HTTP ${response.status}. Check that the FTP remote root is the public web root for this domain.`
@@ -147,6 +155,16 @@ async function verifyPublicPage({ url, expectedText }: PublicVerification) {
     throw new Error(
       `FTP upload completed, but public verification failed: ${url} is reachable but does not show the generated blog. Check DNS/hosting and FTP remote root; the upload account appears to be different from the live web root.`
     );
+  }
+}
+
+function verificationUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("aeo_verify", Date.now().toString());
+    return parsed.toString();
+  } catch {
+    return url;
   }
 }
 

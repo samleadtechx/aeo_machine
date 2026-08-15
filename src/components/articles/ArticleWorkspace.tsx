@@ -86,6 +86,7 @@ type ToastState = {
 
 type PublishResult = {
   articleUrl?: string;
+  mainPageUrl?: string;
   uploadedFiles?: number;
   error?: string;
   stage?: string;
@@ -293,7 +294,7 @@ export function ArticleWorkspace({
       }
       driftProgress({
         label: "Publishing and uploading",
-        detail: "Rendering static HTML, copying assets, and uploading files to FTP/SFTP.",
+        detail: "Rebuilding the article, main page, feeds, sitemap, assets, and uploading files to FTP/SFTP.",
         start: 34,
         ceiling: 92,
       });
@@ -307,6 +308,7 @@ export function ArticleWorkspace({
       if (!response.ok) {
         setPublishResult({
           articleUrl: data.articleUrl,
+          mainPageUrl: data.mainPageUrl,
           error: data.error || "Publish/upload failed.",
           stage: data.stage,
         });
@@ -318,9 +320,9 @@ export function ArticleWorkspace({
         return;
       }
       const uploadedFiles = Number(data.deployment?.uploadedFiles || 0);
-      setPublishResult({ articleUrl: data.articleUrl, uploadedFiles });
-      completeProgress("Published and uploaded", `Uploaded ${uploadedFiles} files to the saved FTP/SFTP target.`);
-      notify("success", `Article published and uploaded ${uploadedFiles} files.`);
+      setPublishResult({ articleUrl: data.articleUrl, mainPageUrl: data.mainPageUrl, uploadedFiles });
+      completeProgress("Published and uploaded", `Uploaded ${uploadedFiles} files and verified the article plus main page.`);
+      notify("success", `Article published, main page rebuilt, and uploaded ${uploadedFiles} files.`);
     });
   }
 
@@ -818,6 +820,14 @@ export function ArticleWorkspace({
                   Public URL:{" "}
                   <a href={publishResult.articleUrl} target="_blank" rel="noreferrer">
                     {publishResult.articleUrl}
+                  </a>
+                </div>
+              ) : null}
+              {publishResult.mainPageUrl ? (
+                <div>
+                  Main page:{" "}
+                  <a href={publishResult.mainPageUrl} target="_blank" rel="noreferrer">
+                    {publishResult.mainPageUrl}
                   </a>
                 </div>
               ) : null}

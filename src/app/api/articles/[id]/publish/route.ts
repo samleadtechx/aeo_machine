@@ -30,8 +30,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     orderBy: { createdAt: "desc" },
   });
   const articleUrl = canonicalArticleUrl(articleWithBlog.blog.baseUrl, articleWithBlog.slug, target?.cleanUrlMode !== "HTML");
+  const mainPageUrl = articleWithBlog.blog.baseUrl;
   if (!body.deploy) {
-    return NextResponse.json({ article, articleUrl });
+    return NextResponse.json({ article, articleUrl, mainPageUrl });
   }
 
   let build;
@@ -43,11 +44,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const deployment = await deployBuild(build.id, {
-      publicVerifications: [{ url: articleUrl, expectedText: articleWithBlog.title }],
+      publicVerifications: [
+        { url: articleUrl, expectedText: articleWithBlog.title },
+        { url: mainPageUrl, expectedText: articleWithBlog.title },
+      ],
     });
-    return NextResponse.json({ article, articleUrl, build, deployment });
+    return NextResponse.json({ article, articleUrl, mainPageUrl, build, deployment });
   } catch (error) {
-    return stageError("deploy", error, { article, articleUrl, build }, 502);
+    return stageError("deploy", error, { article, articleUrl, mainPageUrl, build }, 502);
   }
 }
 
