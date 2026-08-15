@@ -133,7 +133,12 @@ export default async function SettingsPage() {
       />
 
       <BabyLoveGrowthSettingsManager
-        initialBlogs={blogs.map((blog) => ({ id: blog.id, name: blog.name, slug: blog.slug }))}
+        initialBlogs={blogs.map((blog) => ({
+          id: blog.id,
+          name: blog.name,
+          slug: blog.slug,
+          defaultAuthorName: blog.defaultAuthorName,
+        }))}
         initialSettings={JSON.parse(JSON.stringify(babyLoveGrowthSettings))}
       />
 

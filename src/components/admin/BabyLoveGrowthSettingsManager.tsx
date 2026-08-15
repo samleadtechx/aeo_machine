@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileUp, Power, PowerOff, Save, Tags } from "lucide-react";
+import { FileUp, Power, PowerOff, Save, Tags, UserRound } from "lucide-react";
 
 type BlogOption = {
   id: string;
   name: string;
   slug: string;
+  defaultAuthorName: string;
 };
 
 type BabyLoveGrowthSetting = {
@@ -26,9 +27,13 @@ export function BabyLoveGrowthSettingsManager({
   initialBlogs: BlogOption[];
   initialSettings: BabyLoveGrowthSetting[];
 }) {
+  const [blogs, setBlogs] = useState(initialBlogs);
   const [settings, setSettings] = useState(initialSettings);
   const [tagDrafts, setTagDrafts] = useState(() =>
     Object.fromEntries(initialSettings.map((setting) => [setting.blogId, setting.defaultTags.join(", ")]))
+  );
+  const [authorDrafts, setAuthorDrafts] = useState(() =>
+    Object.fromEntries(initialBlogs.map((blog) => [blog.id, blog.defaultAuthorName || "Editorial Team"]))
   );
   const [busyBlogId, setBusyBlogId] = useState("");
   const [message, setMessage] = useState("");
@@ -103,6 +108,44 @@ export function BabyLoveGrowthSettingsManager({
     }
   }
 
+  async function saveAuthor(blog: BlogOption) {
+    const defaultAuthorName = (authorDrafts[blog.id] || "").trim();
+    if (!defaultAuthorName) {
+      setMessage(`${blog.name}: default author is required.`);
+      return;
+    }
+    setBusyBlogId(blog.id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/blogs/${blog.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blog: { defaultAuthorName } }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.error || "Default author could not be saved.");
+        return;
+      }
+      setBlogs((current) =>
+        current.map((item) =>
+          item.id === blog.id
+            ? { ...item, defaultAuthorName: data.blog?.defaultAuthorName || defaultAuthorName }
+            : item
+        )
+      );
+      setAuthorDrafts((current) => ({
+        ...current,
+        [blog.id]: data.blog?.defaultAuthorName || defaultAuthorName,
+      }));
+      setMessage(`${blog.name}: default author saved.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Default author could not be saved.");
+    } finally {
+      setBusyBlogId("");
+    }
+  }
+
   return (
     <section className="panel panel-pad stack" style={{ marginTop: 16 }}>
       <div className="button-row" style={{ justifyContent: "space-between" }}>
@@ -117,10 +160,11 @@ export function BabyLoveGrowthSettingsManager({
       <div className="notice compact-notice">
         Auto-publish runs the same publishing gate as the article editor. If SEO/AEO blockers fail, the
         import stays as a draft and the BabyLoveGrowth import status records the failure. Default tags are
-        only used when BabyLoveGrowth does not send tags with the article.
+        only used when BabyLoveGrowth does not send tags with the article. Default author is stored on the
+        blog and is applied to newly created articles.
       </div>
       <div className="grid-2">
-        {initialBlogs.map((blog) => {
+        {blogs.map((blog) => {
           const setting = settingsByBlog.get(blog.id);
           const autoPublish = setting?.autoPublish ?? false;
           const defaultTags = setting?.defaultTags ?? [];
@@ -135,6 +179,28 @@ export function BabyLoveGrowthSettingsManager({
                 <span className={`badge ${autoPublish ? "pass" : "warn"}`}>
                   {autoPublish ? "Auto-publish on" : "Draft only"}
                 </span>
+              </div>
+              <label className="field">
+                <span>Default author</span>
+                <input
+                  className="input"
+                  placeholder="Editorial Team"
+                  value={authorDrafts[blog.id] ?? blog.defaultAuthorName}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setAuthorDrafts((current) => ({ ...current, [blog.id]: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="button-row" style={{ justifyContent: "space-between" }}>
+                <span className="mini-pill">
+                  <UserRound size={13} />
+                  {blog.defaultAuthorName || "Editorial Team"}
+                </span>
+                <button className="btn" type="button" disabled={busy} onClick={() => void saveAuthor(blog)}>
+                  <Save size={16} />
+                  {busy ? "Saving..." : "Save Author"}
+                </button>
               </div>
               <label className="field">
                 <span>Default import tags</span>
