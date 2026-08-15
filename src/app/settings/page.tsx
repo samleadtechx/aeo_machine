@@ -50,6 +50,9 @@ export default async function SettingsPage() {
     const babyLoveGrowthAutoPublish = isBabyLoveGrowth
       ? babyLoveGrowthSettingsByBlog.get(endpoint.blogId)?.autoPublish ?? false
       : undefined;
+    const babyLoveGrowthDefaultTags = isBabyLoveGrowth
+      ? babyLoveGrowthSettingsByBlog.get(endpoint.blogId)?.defaultTags ?? []
+      : undefined;
     const copyAll = {
       blog: endpoint.blog.name,
       type: endpoint.type,
@@ -57,6 +60,7 @@ export default async function SettingsPage() {
       url,
       publicId: endpoint.publicId,
       ...(isBabyLoveGrowth ? { autoPublish: babyLoveGrowthAutoPublish } : {}),
+      ...(isBabyLoveGrowth ? { defaultTags: babyLoveGrowthDefaultTags } : {}),
       [isBabyLoveGrowth ? "bearerToken" : "secret"]: secret,
       headers: isBabyLoveGrowth
         ? {

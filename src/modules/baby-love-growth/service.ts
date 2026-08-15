@@ -22,11 +22,12 @@ type BabyLoveGrowthPayload = {
   languageCode?: string;
   jsonLd?: unknown;
   faqJsonLd?: unknown;
-  tags?: string[];
+  tags?: string[] | string;
 };
 
 type BabyLoveGrowthSettingsJson = {
   autoPublish: boolean;
+  defaultTags: string[];
 };
 
 export type BabyLoveGrowthBlogSetting = {
@@ -34,6 +35,7 @@ export type BabyLoveGrowthBlogSetting = {
   blogName: string;
   blogSlug: string;
   autoPublish: boolean;
+  defaultTags: string[];
   enabled: boolean;
   updatedAt: Date | null;
 };
@@ -64,6 +66,7 @@ export async function listBabyLoveGrowthSettings(): Promise<BabyLoveGrowthBlogSe
       blogName: blog.name,
       blogSlug: blog.slug,
       autoPublish: settings.autoPublish,
+      defaultTags: settings.defaultTags,
       enabled: credential?.enabled ?? true,
       updatedAt: credential?.updatedAt ?? null,
     };
@@ -71,6 +74,13 @@ export async function listBabyLoveGrowthSettings(): Promise<BabyLoveGrowthBlogSe
 }
 
 export async function setBabyLoveGrowthAutoPublish(blogId: string, autoPublish: boolean) {
+  return setBabyLoveGrowthSettings(blogId, { autoPublish });
+}
+
+export async function setBabyLoveGrowthSettings(
+  blogId: string,
+  input: { autoPublish?: boolean; defaultTags?: string[] }
+) {
   const blog = await prisma.blog.findUnique({
     where: { id: blogId },
     select: { id: true, name: true, slug: true },
@@ -79,7 +89,8 @@ export async function setBabyLoveGrowthAutoPublish(blogId: string, autoPublish: 
   const existing = await latestBabyLoveGrowthCredential(blogId);
   const settings = {
     ...parseBabyLoveGrowthSettings(existing?.settingsJson),
-    autoPublish,
+    ...(input.autoPublish === undefined ? {} : { autoPublish: input.autoPublish }),
+    ...(input.defaultTags === undefined ? {} : { defaultTags: normalizeTagList(input.defaultTags) }),
   };
 
   const credential = existing
@@ -104,7 +115,7 @@ export async function setBabyLoveGrowthAutoPublish(blogId: string, autoPublish: 
     blogId: blog.id,
     blogName: blog.name,
     blogSlug: blog.slug,
-    autoPublish: parseBabyLoveGrowthSettings(credential.settingsJson).autoPublish,
+    ...parseBabyLoveGrowthSettings(credential.settingsJson),
     enabled: credential.enabled,
     updatedAt: credential.updatedAt,
   };
@@ -125,6 +136,8 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
     if (articleStillExists) return maybeAutoPublishImport(existing);
   }
 
+  const settings = await babyLoveGrowthSettings(blogId);
+  const payloadTags = normalizeTagList(payload.tags);
   const article = await createArticle(blogId, {
     title: payload.title || "Untitled BabyLoveGrowth Article",
     slug: ensureSlug(payload.slug || payload.title || externalArticleId),
@@ -132,7 +145,7 @@ export async function importBabyLoveGrowthArticle(blogId: string, payload: BabyL
     excerpt: payload.excerpt || payload.metaDescription,
     metaTitle: payload.metaTitle || payload.title,
     metaDescription: payload.metaDescription,
-    tags: payload.tags?.length ? payload.tags : ["BabyLoveGrowth", "Imported"],
+    tags: payloadTags.length ? payloadTags : settings.defaultTags,
     source: "BABYLOVEGROWTH",
     sourceExternalId: externalArticleId,
     noindex: false,
@@ -167,9 +180,13 @@ export async function syncBabyLoveGrowth() {
 }
 
 async function babyLoveGrowthAutoPublishEnabled(blogId: string) {
+  return (await babyLoveGrowthSettings(blogId)).autoPublish;
+}
+
+async function babyLoveGrowthSettings(blogId: string) {
   const credential = await latestBabyLoveGrowthCredential(blogId);
-  if (!credential?.enabled) return false;
-  return parseBabyLoveGrowthSettings(credential.settingsJson).autoPublish;
+  if (!credential?.enabled) return { autoPublish: false, defaultTags: [] };
+  return parseBabyLoveGrowthSettings(credential.settingsJson);
 }
 
 async function latestBabyLoveGrowthCredential(blogId: string) {
@@ -205,8 +222,29 @@ async function maybeAutoPublishImport(imported: BabyLoveGrowthImport) {
 
 function parseBabyLoveGrowthSettings(settingsJson: unknown): BabyLoveGrowthSettingsJson {
   if (!settingsJson || typeof settingsJson !== "object" || Array.isArray(settingsJson)) {
-    return { autoPublish: false };
+    return { autoPublish: false, defaultTags: [] };
   }
   const settings = settingsJson as Record<string, unknown>;
-  return { autoPublish: settings.autoPublish === true };
+  return {
+    autoPublish: settings.autoPublish === true,
+    defaultTags: normalizeTagList(settings.defaultTags),
+  };
+}
+
+function normalizeTagList(tags: unknown) {
+  if (typeof tags === "string") return normalizeTagText(tags);
+  if (!Array.isArray(tags)) return [];
+  return normalizeTagText(tags.map((tag) => String(tag)).join(","));
+}
+
+function normalizeTagText(tags: string) {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const tag of tags.split(",")) {
+    const value = tag.trim();
+    if (!value || seen.has(value.toLowerCase())) continue;
+    seen.add(value.toLowerCase());
+    normalized.push(value);
+  }
+  return normalized;
 }

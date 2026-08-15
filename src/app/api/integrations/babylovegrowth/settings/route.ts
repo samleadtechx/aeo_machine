@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiError, requireAdminApi } from "@/lib/auth/api";
 import {
   listBabyLoveGrowthSettings,
-  setBabyLoveGrowthAutoPublish,
+  setBabyLoveGrowthSettings,
 } from "@/modules/baby-love-growth/service";
 
 export const runtime = "nodejs";
@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
 
 const settingsPatchSchema = z.object({
   blogId: z.string().min(1),
-  autoPublish: z.boolean(),
+  autoPublish: z.boolean().optional(),
+  defaultTags: z.array(z.string()).optional(),
+}).refine((input) => input.autoPublish !== undefined || input.defaultTags !== undefined, {
+  message: "At least one BabyLoveGrowth setting is required.",
 });
 
 export async function GET() {
@@ -25,7 +28,10 @@ export async function PATCH(request: Request) {
   if (auth.response) return auth.response;
   try {
     const input = settingsPatchSchema.parse(await request.json());
-    const setting = await setBabyLoveGrowthAutoPublish(input.blogId, input.autoPublish);
+    const setting = await setBabyLoveGrowthSettings(input.blogId, {
+      autoPublish: input.autoPublish,
+      defaultTags: input.defaultTags,
+    });
     return NextResponse.json({ setting });
   } catch (error) {
     return apiError(error);
