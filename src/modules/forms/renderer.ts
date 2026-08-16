@@ -255,9 +255,24 @@ header('X-Robots-Tag: noindex, nofollow', true);
 
 $webhookUrl = '${escapePhp(publicWebhookBaseUrl())}/api/public/blog-webhooks/${escapePhp(endpoint.publicId)}/events';
 $webhookSecret = '${escapePhp(webhookSecret)}';
-$payload = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
+$raw = file_get_contents('php://input') ?: '';
+$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && stripos($contentType, 'application/json') !== false) {
+  $decoded = json_decode($raw, true);
+  $payload = is_array($decoded) ? $decoded : [];
+} else {
+  $payload = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
+}
+$server = [];
+foreach ($_SERVER as $key => $value) {
+  if (strpos($key, 'HTTP_') === 0 || in_array($key, ['REMOTE_ADDR', 'REQUEST_METHOD', 'QUERY_STRING', 'REQUEST_URI', 'SERVER_NAME', 'SERVER_PORT', 'HTTPS'], true)) {
+    $server[$key] = $value;
+  }
+}
 $payload['userAgent'] = $_SERVER['HTTP_USER_AGENT'] ?? null;
 $payload['referrer'] = $payload['referrer'] ?? ($_SERVER['HTTP_REFERER'] ?? null);
+$payload['query'] = $payload['query'] ?? $_GET;
+$payload['server'] = $server;
 $body = json_encode($payload);
 $timestamp = (string) time();
 $signature = hash_hmac('sha256', $timestamp . '.' . $body, $webhookSecret);
@@ -476,6 +491,10 @@ function funnelScript(
     $('[data-event-id]').value = state.eventId;
   };
   const track = (eventName, extra) => {
+    if (eventName === 'Lead' && window.AEOAnalytics && typeof window.AEOAnalytics.trackLead === 'function') {
+      window.AEOAnalytics.trackLead(state.eventId, Object.assign({ funnelSlug: slug }, extra || {}));
+      return;
+    }
     const params = new URLSearchParams(Object.assign({
       event_name: eventName,
       event_id: state.eventId,
@@ -527,7 +546,10 @@ function funnelScript(
       resultText: state.resultText,
       sourceUrl: window.location.href,
       referrer: document.referrer || '',
-      utm: Object.fromEntries(new URLSearchParams(window.location.search).entries())
+      utm: Object.fromEntries(new URLSearchParams(window.location.search).entries()),
+      tracking: window.AEOAnalytics && typeof window.AEOAnalytics.context === 'function'
+        ? window.AEOAnalytics.context()
+        : {}
     });
     track('Lead', { content_type:'lead', content_name:slug });
     const response = await fetch(submitUrl, {

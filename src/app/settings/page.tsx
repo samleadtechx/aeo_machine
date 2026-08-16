@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AnalyticsSettingsManager } from "@/components/admin/AnalyticsSettingsManager";
 import { BabyLoveGrowthSettingsManager } from "@/components/admin/BabyLoveGrowthSettingsManager";
 import { CopyValue } from "@/components/admin/CopyValue";
 import { ImageOptimizationManager } from "@/components/admin/ImageOptimizationManager";
@@ -7,6 +8,7 @@ import { OutboundWebhookManager } from "@/components/admin/OutboundWebhookManage
 import { appUrl, publicWebhookBaseUrl, storageDir } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto/encryption";
+import { listAnalyticsSettings } from "@/modules/analytics/service";
 import { listBabyLoveGrowthSettings } from "@/modules/baby-love-growth/service";
 import { ensurePublicWebhookEndpoint, listBlogs } from "@/modules/blogs/service";
 import { listOutboundWebhooks } from "@/modules/leads/outbound";
@@ -24,7 +26,7 @@ export default async function SettingsPage() {
     )
   );
 
-  const [user, endpoints, media, outboundWebhooks, babyLoveGrowthSettings] = await Promise.all([
+  const [user, endpoints, media, outboundWebhooks, babyLoveGrowthSettings, analyticsSettings] = await Promise.all([
     prisma.user.findFirst(),
     prisma.publicWebhookEndpoint.findMany({
       include: { blog: { select: { name: true, slug: true } } },
@@ -33,6 +35,7 @@ export default async function SettingsPage() {
     listMediaAssets(),
     listOutboundWebhooks(),
     listBabyLoveGrowthSettings(),
+    listAnalyticsSettings(),
   ]);
   const baseUrl = appUrl().replace(/\/+$/, "");
   const webhookBaseUrl = publicWebhookBaseUrl();
@@ -140,6 +143,15 @@ export default async function SettingsPage() {
           defaultAuthorName: blog.defaultAuthorName,
         }))}
         initialSettings={JSON.parse(JSON.stringify(babyLoveGrowthSettings))}
+      />
+
+      <AnalyticsSettingsManager
+        initialBlogs={blogs.map((blog) => ({
+          id: blog.id,
+          name: blog.name,
+          slug: blog.slug,
+        }))}
+        initialSettings={JSON.parse(JSON.stringify(analyticsSettings))}
       />
 
       <section className="panel panel-pad stack" style={{ marginTop: 16 }}>

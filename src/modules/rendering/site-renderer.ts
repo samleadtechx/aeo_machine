@@ -10,6 +10,7 @@ import { escapeAttribute, escapeHtml, jsonScript, stripHtml } from "@/lib/utils/
 import { formatDate } from "@/lib/utils/dates";
 import { auditArticleSeo } from "@/modules/seo/audit";
 import { markdownToHtml } from "@/modules/articles/markdown";
+import { getAnalyticsRenderSettings, type AnalyticsRenderSettings } from "@/modules/analytics/service";
 import { ensurePublicWebhookEndpoint } from "@/modules/blogs/service";
 import { renderFunnelHtml, renderSubmitPhp, renderTrackPhp } from "@/modules/forms/renderer";
 import {
@@ -84,6 +85,7 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
     const leadSecret = decryptSecret(leadEndpoint.secretEncrypted);
     const trackingSecret = decryptSecret(trackingEndpoint.secretEncrypted);
     if (!leadSecret || !trackingSecret) throw new Error("Blog webhook secrets are missing.");
+    const analyticsSettings = await getAnalyticsRenderSettings(blog.id);
 
     const outputPath = path.resolve(storageDir(), "builds", blog.id, build.id);
     await rm(outputPath, { recursive: true, force: true });
@@ -118,7 +120,18 @@ export async function buildBlogStaticSite(blogId: string, reason: BuildReason = 
     await writeFile(path.join(outputPath, "track", "collect.php"), renderTrackPhp(trackingEndpoint, trackingSecret), "utf8");
 
     for (const article of articles) {
-      const html = await renderArticlePage(blog, article, articles, funnels, leadEndpoint, leadSecret, mediaMap, imageSourceMap, renderOptions);
+      const html = await renderArticlePage(
+        blog,
+        article,
+        articles,
+        funnels,
+        leadEndpoint,
+        leadSecret,
+        mediaMap,
+        imageSourceMap,
+        renderOptions,
+        analyticsSettings
+      );
       await writeFile(path.join(outputPath, `${article.slug}.html`), html, "utf8");
     }
 
@@ -195,7 +208,8 @@ async function renderArticlePage(
   leadSecret: string,
   mediaMap: BuildMediaMap,
   imageSourceMap: BuildImageSourceMap,
-  options: RenderOptions
+  options: RenderOptions,
+  analyticsSettings: AnalyticsRenderSettings
 ) {
   const canonical = articleCanonicalUrl(blog, article, options);
   const rewrittenMarkdown = await replaceMarkdownMediaReferences(blog.id, article.markdown, mediaMap, imageSourceMap);
@@ -241,6 +255,7 @@ async function renderArticlePage(
     title: article.metaTitle || article.title,
     description: article.metaDescription || article.excerpt || "",
     canonical,
+    bodyScript: renderArticleTrackingScript(blog, article, options, analyticsSettings),
     content: `
       <article class="article">
         <header class="article-head">
@@ -401,8 +416,9 @@ function pageShell(props: {
   description: string;
   canonical: string;
   content: string;
+  bodyScript?: string;
 }) {
-  const { blog, mediaMap = {}, title, description, canonical, content } = props;
+  const { blog, mediaMap = {}, title, description, canonical, content, bodyScript = "" } = props;
   const logoUrl = blog.logoMediaId ? mediaMap[blog.logoMediaId] : null;
   const faviconUrl = (blog.faviconMediaId ? mediaMap[blog.faviconMediaId] : null) || logoUrl;
   return `<!doctype html>
@@ -434,8 +450,154 @@ function pageShell(props: {
     <span>${escapeHtml(blog.organizationName || blog.brandName)}</span>
     <span>All rights reserved.</span>
   </footer>
+  ${bodyScript}
 </body>
 </html>`;
+}
+
+function renderArticleTrackingScript(
+  blog: Blog,
+  article: Pick<Article, "slug" | "title">,
+  options: RenderOptions,
+  settings: AnalyticsRenderSettings
+) {
+  if (!settings.trackingEnabled) return "";
+  const trackUrl = publicPath(blog, `track/collect.${options.htaccessEnabled ? "html" : "php"}`);
+  const config = {
+    trackUrl,
+    pixelId: settings.pixelId,
+    eventMap: settings.eventMap,
+    deepReadScrollPercent: settings.deepReadScrollPercent,
+    deepReadSeconds: settings.deepReadSeconds,
+    articleSlug: article.slug,
+    articleTitle: article.title,
+  };
+
+  return `<script>
+(() => {
+  const config = ${jsonScript(config)};
+  const standardEvents = new Set(['PageView','ViewContent','Lead','CompleteRegistration','Contact','CustomizeProduct','Donate','FindLocation','Schedule','Search','StartTrial','SubmitApplication','Subscribe']);
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+  const getCookie = (name) => document.cookie.split('; ').find((item) => item.startsWith(name + '='))?.split('=')[1] || '';
+  const setCookie = (name, value) => {
+    document.cookie = name + '=' + encodeURIComponent(value) + '; Max-Age=31536000; Path=/; SameSite=Lax';
+  };
+  const storedVisitor = localStorage.getItem('aeo_visitor_id') || decodeURIComponent(getCookie('aeo_vid') || '');
+  const visitorId = storedVisitor || 'v_' + uuid();
+  localStorage.setItem('aeo_visitor_id', visitorId);
+  setCookie('aeo_vid', visitorId);
+  const sessionId = sessionStorage.getItem('aeo_session_id') || 's_' + uuid();
+  sessionStorage.setItem('aeo_session_id', sessionId);
+  const landingUrl = sessionStorage.getItem('aeo_landing_url') || window.location.href;
+  sessionStorage.setItem('aeo_landing_url', landingUrl);
+  const query = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+  const utm = Object.fromEntries(Object.entries(query).filter(([key]) => /^utm_|^(gclid|fbclid|msclkid|refer)$/i.test(key)));
+  const device = () => ({
+    browser: navigator.userAgent,
+    language: navigator.language || '',
+    platform: navigator.platform || '',
+    viewport: window.innerWidth + 'x' + window.innerHeight,
+    screen: (screen.width || 0) + 'x' + (screen.height || 0),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  });
+
+  if (config.pixelId) {
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', config.pixelId);
+  }
+
+  const pixelTrack = (eventType, eventName, eventId, customData) => {
+    if (!config.pixelId || typeof fbq !== 'function' || !eventName) return;
+    const method = eventType === 'DEEP_READ' || !standardEvents.has(eventName) ? 'trackCustom' : 'track';
+    fbq(method, eventName, customData || {}, { eventID: eventId });
+  };
+
+  const postEvent = (eventType, eventName, eventId, extra = {}) => {
+    const payload = Object.assign({
+      event_type: eventType,
+      event_name: eventName,
+      event_id: eventId,
+      source_url: window.location.href,
+      landing_url: landingUrl,
+      article_slug: config.articleSlug,
+      referrer: document.referrer || '',
+      visitor_id: visitorId,
+      session_id: sessionId,
+      fbp: decodeURIComponent(getCookie('_fbp') || ''),
+      fbc: decodeURIComponent(getCookie('_fbc') || ''),
+      utm,
+      query,
+      device: device()
+    }, extra);
+    const customData = {
+      content_type: payload.content_type || 'article',
+      content_name: payload.content_name || config.articleTitle,
+      article_slug: config.articleSlug,
+      source_url: window.location.href
+    };
+    pixelTrack(eventType, eventName, eventId, customData);
+    const body = new URLSearchParams();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      body.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(config.trackUrl, body);
+    } else {
+      fetch(config.trackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body,
+        credentials: 'same-origin',
+        keepalive: true
+      }).catch(() => {});
+    }
+  };
+
+  window.AEOAnalytics = {
+    context() {
+      return { visitorId, sessionId, landingUrl, query, utm, device: device() };
+    },
+    trackLead(eventId, extra = {}) {
+      postEvent('LEAD', config.eventMap.lead, eventId || uuid(), Object.assign({
+        content_type: 'lead',
+        content_name: extra.funnelSlug || config.articleTitle
+      }, extra));
+    },
+    trackEvent: postEvent
+  };
+
+  postEvent('ARTICLE_OPEN', config.eventMap.articleOpen, uuid(), {
+    content_type: 'article',
+    content_name: config.articleTitle
+  });
+
+  let deepReadSent = false;
+  let timeReady = false;
+  const threshold = Math.max(10, Math.min(100, Number(config.deepReadScrollPercent) || 70));
+  const maybeDeepRead = () => {
+    if (deepReadSent || !timeReady) return;
+    const doc = document.documentElement;
+    const body = document.body;
+    const scrollHeight = Math.max(doc.scrollHeight, body ? body.scrollHeight : 0, window.innerHeight);
+    const percent = Math.min(100, Math.round(((window.scrollY + window.innerHeight) / scrollHeight) * 100));
+    if (percent < threshold) return;
+    deepReadSent = true;
+    postEvent('DEEP_READ', config.eventMap.deepRead, uuid(), {
+      content_type: 'article',
+      content_name: config.articleTitle,
+      scroll_percent: percent,
+      seconds_on_page: Math.max(1, Math.round((performance.now ? performance.now() : 0) / 1000))
+    });
+  };
+  setTimeout(() => {
+    timeReady = true;
+    maybeDeepRead();
+  }, Math.max(1, Number(config.deepReadSeconds) || 45) * 1000);
+  window.addEventListener('scroll', maybeDeepRead, { passive: true });
+  window.addEventListener('resize', maybeDeepRead);
+})();
+</script>`;
 }
 
 function themeCss(blog: Blog) {

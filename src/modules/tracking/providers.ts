@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import type { IntegrationCredential, TrackingEvent } from "@prisma/client";
 import { decryptJson } from "@/lib/crypto/encryption";
 
@@ -36,6 +37,12 @@ export const metaProvider: ConversionProvider = {
     return `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixelId}');`;
   },
   buildServerPayload(event, config) {
+    const customData = { ...event.payload };
+    delete customData.email;
+    delete customData.phone;
+    delete customData.userAgent;
+    delete customData.fbp;
+    delete customData.fbc;
     return {
       data: [
         {
@@ -44,8 +51,14 @@ export const metaProvider: ConversionProvider = {
           event_id: event.eventId,
           action_source: "website",
           event_source_url: event.sourceUrl,
-          user_data: {},
-          custom_data: event.payload,
+          user_data: {
+            client_user_agent: event.userAgent || undefined,
+            em: event.email ? [hashForMeta(event.email)] : undefined,
+            ph: event.phone ? [hashForMeta(event.phone)] : undefined,
+            fbp: typeof event.payload.fbp === "string" ? event.payload.fbp : undefined,
+            fbc: typeof event.payload.fbc === "string" ? event.payload.fbc : undefined,
+          },
+          custom_data: customData,
         },
       ],
       test_event_code: config.testEventCode || undefined,
@@ -103,14 +116,22 @@ export const providers: Record<ConversionProvider["provider"], ConversionProvide
 };
 
 export function normalizeStoredEvent(event: TrackingEvent): NormalizedTrackingEvent {
+  const payload =
+    event.payloadJson && typeof event.payloadJson === "object"
+      ? (event.payloadJson as Record<string, unknown>)
+      : {};
   return {
     eventName: event.eventName,
     eventId: event.eventId,
     eventTime: event.eventTime,
     sourceUrl: event.sourceUrl,
-    payload:
-      event.payloadJson && typeof event.payloadJson === "object"
-        ? (event.payloadJson as Record<string, unknown>)
-        : {},
+    userAgent: typeof payload.userAgent === "string" ? payload.userAgent : null,
+    email: typeof payload.email === "string" ? payload.email : null,
+    phone: typeof payload.phone === "string" ? payload.phone : null,
+    payload,
   };
+}
+
+function hashForMeta(value: string) {
+  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }

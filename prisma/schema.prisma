@@ -91,6 +91,12 @@ enum TrackingEventStatus {
   SKIPPED
 }
 
+enum AnalyticsEventType {
+  ARTICLE_OPEN
+  DEEP_READ
+  LEAD
+}
+
 enum OutboundWebhookMethod {
   POST
   PUT
@@ -204,6 +210,7 @@ model Blog {
   funnels                 Funnel[]
   placementRules          FunnelPlacementRule[]
   leads                   Lead[]
+  analyticsEvents         AnalyticsEvent[]
   trackingEvents          TrackingEvent[]
   outboundWebhooks        OutboundWebhook[]
   integrationCredentials  IntegrationCredential[]
@@ -267,6 +274,7 @@ model Article {
   blog                  Blog                   @relation(fields: [blogId], references: [id], onDelete: Cascade)
   tags                  ArticleTag[]
   leads                 Lead[]
+  analyticsEvents       AnalyticsEvent[]
   seoAuditIssues        SeoAuditIssue[]
   babyLoveGrowthImports BabyLoveGrowthImport[]
 
@@ -380,6 +388,7 @@ model Lead {
   blog               Blog                      @relation(fields: [blogId], references: [id], onDelete: Cascade)
   funnel             Funnel?                   @relation(fields: [funnelId], references: [id], onDelete: SetNull)
   article            Article?                  @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  analyticsEvents    AnalyticsEvent[]
   trackingEvents     TrackingEvent[]
   outboundDeliveries OutboundWebhookDelivery[]
 
@@ -387,6 +396,40 @@ model Lead {
   @@index([blogId])
   @@index([funnelId])
   @@index([createdAt])
+}
+
+model AnalyticsEvent {
+  id          String             @id @default(cuid())
+  blogId      String
+  articleId   String?
+  leadId      String?
+  eventType   AnalyticsEventType
+  eventName   String
+  eventId     String
+  visitorId   String?
+  sessionId   String?
+  sourceUrl   String?
+  landingUrl  String?
+  articleSlug String?
+  referrer    String?
+  userAgent   String?
+  ipHash      String?
+  utmJson     Json?
+  queryJson   Json?
+  deviceJson  Json?
+  requestJson Json?
+  payloadJson Json?
+  createdAt   DateTime           @default(now())
+  blog        Blog               @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  article     Article?           @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  lead        Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([blogId, eventId, eventType])
+  @@index([blogId, createdAt])
+  @@index([articleId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([visitorId])
+  @@index([sessionId])
 }
 
 model TrackingEvent {

@@ -20,7 +20,7 @@ export async function queueTrackingEvents(input: {
     },
   });
   if (credentials.length === 0) return [];
-  return Promise.all(
+  const events = await Promise.all(
     credentials.map((credential) =>
       prisma.trackingEvent.upsert({
         where: {
@@ -43,6 +43,19 @@ export async function queueTrackingEvents(input: {
       })
     )
   );
+  if (events.length > 0) {
+    await prisma.job.create({
+      data: {
+        type: "SEND_CONVERSION_EVENT",
+        payloadJson: {
+          blogId: input.blogId,
+          eventName: input.eventName,
+          eventId: input.eventId,
+        },
+      },
+    });
+  }
+  return events;
 }
 
 export async function sendPendingTrackingEvents(limit = 25) {

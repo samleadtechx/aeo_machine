@@ -22,6 +22,7 @@ const nav = [
   { href: "/articles", label: "Articles", icon: FileText },
   { href: "/funnels", label: "Funnels", icon: FormInput },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/deployments", label: "Deployments", icon: Rocket },
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/mcp", label: "MCP", icon: Bot },

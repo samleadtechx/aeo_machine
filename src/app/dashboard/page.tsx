@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FilePlus2, FormInput, Globe2, Rocket } from "lucide-react";
+import { BookOpenCheck, Eye, FilePlus2, FormInput, Gauge, Globe2, Rocket } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils/dates";
@@ -7,11 +7,15 @@ import { formatDateTime } from "@/lib/utils/dates";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const sevenDaysAgo = daysAgo(7);
   const [
     totalBlogs,
     publishedArticles,
     reviewDrafts,
     failedSeo,
+    articleOpens7d,
+    deepReads7d,
+    leads7d,
     recentLeads,
     recentDeployments,
   ] = await Promise.all([
@@ -19,6 +23,9 @@ export default async function DashboardPage() {
     prisma.article.count({ where: { status: "PUBLISHED" } }),
     prisma.article.count({ where: { status: { in: ["DRAFT", "REVIEW"] } } }),
     prisma.article.count({ where: { seoGateStatus: "FAIL" } }),
+    prisma.analyticsEvent.count({ where: { eventType: "ARTICLE_OPEN", createdAt: { gte: sevenDaysAgo } } }),
+    prisma.analyticsEvent.count({ where: { eventType: "DEEP_READ", createdAt: { gte: sevenDaysAgo } } }),
+    prisma.lead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.lead.findMany({
       orderBy: { createdAt: "desc" },
       take: 5,
@@ -71,6 +78,29 @@ export default async function DashboardPage() {
           <strong>{failedSeo}</strong>
           <span>SEO blockers</span>
         </div>
+      </section>
+
+      <section className="grid-4" style={{ marginTop: 16 }}>
+        <Link className="panel stat stat-link" href="/analytics">
+          <Eye size={18} />
+          <strong>{articleOpens7d}</strong>
+          <span>Article opens, 7 days</span>
+        </Link>
+        <Link className="panel stat stat-link" href="/analytics">
+          <BookOpenCheck size={18} />
+          <strong>{deepReads7d}</strong>
+          <span>Deep reads, 7 days</span>
+        </Link>
+        <Link className="panel stat stat-link" href="/analytics">
+          <Gauge size={18} />
+          <strong>{articleOpens7d ? Math.round((deepReads7d / articleOpens7d) * 100) : 0}%</strong>
+          <span>Deep-read rate</span>
+        </Link>
+        <Link className="panel stat stat-link" href="/leads">
+          <FormInput size={18} />
+          <strong>{leads7d}</strong>
+          <span>Leads, 7 days</span>
+        </Link>
       </section>
 
       <section className="grid-2" style={{ marginTop: 16 }}>
@@ -153,4 +183,8 @@ export default async function DashboardPage() {
       </section>
     </AdminShell>
   );
+}
+
+function daysAgo(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
