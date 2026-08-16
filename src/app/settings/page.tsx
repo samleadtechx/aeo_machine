@@ -5,6 +5,7 @@ import { CopyValue } from "@/components/admin/CopyValue";
 import { ImageOptimizationManager } from "@/components/admin/ImageOptimizationManager";
 import { MediaManager } from "@/components/admin/MediaManager";
 import { OutboundWebhookManager } from "@/components/admin/OutboundWebhookManager";
+import { BarChart3, FileUp, Image as ImageIcon, Link2, ServerCog, SlidersHorizontal, Webhook } from "lucide-react";
 import { appUrl, publicWebhookBaseUrl, storageDir } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto/encryption";
@@ -88,7 +89,39 @@ export default async function SettingsPage() {
           <h1 className="page-title">Settings</h1>
         </div>
       </div>
-      <section className="grid-2">
+
+      <nav className="settings-jump-nav" aria-label="Settings sections">
+        <a className="btn" href="#settings-overview">
+          <ServerCog size={16} />
+          Overview
+        </a>
+        <a className="btn" href="#settings-media">
+          <ImageIcon size={16} />
+          Media
+        </a>
+        <a className="btn" href="#settings-image-optimization">
+          <SlidersHorizontal size={16} />
+          Image Optimization
+        </a>
+        <a className="btn" href="#settings-outbound-webhooks">
+          <Webhook size={16} />
+          Lead Webhooks
+        </a>
+        <a className="btn" href="#settings-babylovegrowth">
+          <FileUp size={16} />
+          BabyLoveGrowth
+        </a>
+        <a className="btn" href="#settings-analytics">
+          <BarChart3 size={16} />
+          Analytics
+        </a>
+        <a className="btn" href="#settings-public-endpoints">
+          <Link2 size={16} />
+          Public Endpoints
+        </a>
+      </nav>
+
+      <section id="settings-overview" className="grid-2 settings-anchor">
         <div className="panel panel-pad stack">
           <strong>Single admin</strong>
           <table className="table">
@@ -120,41 +153,51 @@ export default async function SettingsPage() {
         </div>
       ) : null}
 
-      <MediaManager
-        initialBlogs={JSON.parse(JSON.stringify(blogs))}
-        initialMedia={JSON.parse(JSON.stringify(media))}
-      />
+      <div id="settings-media" className="settings-anchor">
+        <MediaManager
+          initialBlogs={JSON.parse(JSON.stringify(blogs))}
+          initialMedia={JSON.parse(JSON.stringify(media))}
+        />
+      </div>
 
-      <ImageOptimizationManager
-        initialBlogs={JSON.parse(JSON.stringify(blogs))}
-        initialMedia={JSON.parse(JSON.stringify(media))}
-      />
+      <div id="settings-image-optimization" className="settings-anchor">
+        <ImageOptimizationManager
+          initialBlogs={JSON.parse(JSON.stringify(blogs))}
+          initialMedia={JSON.parse(JSON.stringify(media))}
+        />
+      </div>
 
-      <OutboundWebhookManager
-        initialBlogs={JSON.parse(JSON.stringify(blogs))}
-        initialWebhooks={JSON.parse(JSON.stringify(outboundWebhooks))}
-      />
+      <div id="settings-outbound-webhooks" className="settings-anchor">
+        <OutboundWebhookManager
+          initialBlogs={JSON.parse(JSON.stringify(blogs))}
+          initialWebhooks={JSON.parse(JSON.stringify(outboundWebhooks))}
+        />
+      </div>
 
-      <BabyLoveGrowthSettingsManager
-        initialBlogs={blogs.map((blog) => ({
-          id: blog.id,
-          name: blog.name,
-          slug: blog.slug,
-          defaultAuthorName: blog.defaultAuthorName,
-        }))}
-        initialSettings={JSON.parse(JSON.stringify(babyLoveGrowthSettings))}
-      />
+      <div id="settings-babylovegrowth" className="settings-anchor">
+        <BabyLoveGrowthSettingsManager
+          initialBlogs={blogs.map((blog) => ({
+            id: blog.id,
+            name: blog.name,
+            slug: blog.slug,
+            defaultAuthorName: blog.defaultAuthorName,
+          }))}
+          initialSettings={JSON.parse(JSON.stringify(babyLoveGrowthSettings))}
+        />
+      </div>
 
-      <AnalyticsSettingsManager
-        initialBlogs={blogs.map((blog) => ({
-          id: blog.id,
-          name: blog.name,
-          slug: blog.slug,
-        }))}
-        initialSettings={JSON.parse(JSON.stringify(analyticsSettings))}
-      />
+      <div id="settings-analytics" className="settings-anchor">
+        <AnalyticsSettingsManager
+          initialBlogs={blogs.map((blog) => ({
+            id: blog.id,
+            name: blog.name,
+            slug: blog.slug,
+          }))}
+          initialSettings={JSON.parse(JSON.stringify(analyticsSettings))}
+        />
+      </div>
 
-      <section className="panel panel-pad stack" style={{ marginTop: 16 }}>
+      <section id="settings-public-endpoints" className="panel panel-pad stack settings-anchor" style={{ marginTop: 16 }}>
         <div>
           <p className="eyebrow">Copy-ready integration details</p>
           <h2 className="page-title" style={{ fontSize: 22 }}>Public Webhook Endpoints</h2>
