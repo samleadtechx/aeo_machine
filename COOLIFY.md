@@ -46,6 +46,7 @@ PUBLIC_WEBHOOK_SECRET=replace-with-strong-random-secret
 ADMIN_EMAIL=admin@example.com
 ADMIN_NAME=Admin
 ADMIN_PASSWORD=replace-with-real-password
+ADMIN_RESET_PASSWORD=false
 
 RUN_DB_MIGRATIONS=true
 MIGRATION_MAX_ATTEMPTS=20
@@ -74,6 +75,9 @@ npm run admin:bootstrap
 ```
 
 The admin bootstrap creates the first admin user from `ADMIN_EMAIL` and `ADMIN_PASSWORD`. It does not seed demo blogs or articles.
+Changing `ADMIN_PASSWORD` later does not normally reset an existing user. For a one-time password reset,
+set `ADMIN_RESET_PASSWORD=true`, redeploy the web service, log in with the new password, then set it back
+to `false`.
 
 ## Optional Worker Service
 
