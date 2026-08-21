@@ -252,6 +252,7 @@ async function renderArticlePage(
   return pageShell({
     blog,
     mediaMap,
+    ogType: "article",
     title: article.metaTitle || article.title,
     description: article.metaDescription || article.excerpt || "",
     canonical,
@@ -343,6 +344,7 @@ function normalizeHeadingText(value: string) {
 
 function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
   const cards = articles.map((article) => articleCard(blog, article, options, mediaMap)).join("");
+  const schema = renderIndexStructuredData(blog, articles, options, mediaMap);
   return pageShell({
     blog,
     mediaMap,
@@ -364,8 +366,66 @@ function renderIndexPage(blog: Blog, articles: ArticleWithTags[], options: Rende
       <section class="cards" data-article-list>${cards || "<p>No published articles yet.</p>"}</section>
       <p class="article-search-empty" data-search-empty hidden>No articles match your search.</p>
       ${articles.length ? articleSearchScript() : ""}
+      ${jsonLdScripts(schema)}
     `,
   });
+}
+
+function renderIndexStructuredData(
+  blog: Blog,
+  articles: ArticleWithTags[],
+  options: RenderOptions,
+  mediaMap: BuildMediaMap
+) {
+  const organization = {
+    "@type": "Organization",
+    name: blog.organizationName || blog.brandName,
+  };
+  const blogSchema = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    name: `${blog.brandName} Blog`,
+    description: `${blog.brandName} articles, guides, and resources.`,
+    url: blog.baseUrl,
+    publisher: organization,
+  };
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `${blog.brandName} Articles`,
+    description: `${blog.brandName} articles, guides, and resources.`,
+    url: blog.baseUrl,
+    isPartOf: {
+      "@type": "Blog",
+      name: `${blog.brandName} Blog`,
+      url: blog.baseUrl,
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: articles.map((article, index) => {
+        const imageUrl = articleCardImageUrl(article, mediaMap);
+        return {
+          "@type": "ListItem",
+          position: index + 1,
+          item: {
+            "@type": "BlogPosting",
+            headline: article.title,
+            description: article.metaDescription || article.excerpt || undefined,
+            url: articleCanonicalUrl(blog, article, options),
+            datePublished: (article.publishedAt || article.createdAt).toISOString(),
+            dateModified: article.updatedAt.toISOString(),
+            author: { "@type": "Person", name: article.authorName || blog.defaultAuthorName },
+            image: imageUrl ? absolutePublicUrl(blog, imageUrl) : undefined,
+          },
+        };
+      }),
+    },
+  };
+  return [blogSchema, collectionSchema];
+}
+
+function jsonLdScripts(items: unknown[]) {
+  return items.map((item) => `<script type="application/ld+json">${jsonScript(item)}</script>`).join("");
 }
 
 function renderTagPage(blog: Blog, tag: Tag, articles: ArticleWithTags[], options: RenderOptions, mediaMap: BuildMediaMap) {
@@ -416,9 +476,10 @@ function pageShell(props: {
   description: string;
   canonical: string;
   content: string;
+  ogType?: "article" | "website";
   bodyScript?: string;
 }) {
-  const { blog, mediaMap = {}, title, description, canonical, content, bodyScript = "" } = props;
+  const { blog, mediaMap = {}, title, description, canonical, content, ogType = "website", bodyScript = "" } = props;
   const logoUrl = blog.logoMediaId ? mediaMap[blog.logoMediaId] : null;
   const faviconUrl = (blog.faviconMediaId ? mediaMap[blog.faviconMediaId] : null) || logoUrl;
   return `<!doctype html>
@@ -433,7 +494,7 @@ function pageShell(props: {
   <meta property="og:title" content="${escapeAttribute(title)}" />
   <meta property="og:description" content="${escapeAttribute(description)}" />
   <meta property="og:url" content="${escapeAttribute(canonical)}" />
-  <meta property="og:type" content="article" />
+  <meta property="og:type" content="${escapeAttribute(ogType)}" />
   <meta name="twitter:card" content="summary_large_image" />
   ${faviconUrl ? `<link rel="icon" href="${escapeAttribute(faviconUrl)}" />` : ""}
   ${themeCss(blog)}
